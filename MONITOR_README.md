@@ -51,3 +51,7 @@ Open `http://localhost:8503`
 ## License
 
 MIT — same as the original duf project.
+
+---
+
+Developed by **[KCCS](https://kccsonline.com)** — [kccsonline.com](https://kccsonline.com)
