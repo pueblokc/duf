@@ -147,3 +147,11 @@ Got some feedback or suggestions? Please open an issue or drop me a note!
 
 * [Twitter](https://twitter.com/mueslix)
 * [The Fediverse](https://mastodon.social/@fribbledom)
+
+---
+
+## Fork Maintainer
+
+This fork is maintained by **[KCCS](https://kccsonline.com)** with custom web UI enhancements and monitoring integrations.
+
+*[kccsonline.com](https://kccsonline.com)*
