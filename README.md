@@ -1,22 +1,125 @@
-# duf
+# duf-monitor — Enhanced by KCCS
 
-[![Latest Release](https://img.shields.io/github/release/muesli/duf.svg?style=for-the-badge)](https://github.com/muesli/duf/releases)
-[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge)](https://pkg.go.dev/github.com/muesli/duf)
-[![Software License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](/LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/muesli/duf/build.yml?style=for-the-badge&branch=master)](https://github.com/muesli/duf/actions)
-[![Go ReportCard](https://goreportcard.com/badge/github.com/muesli/duf?style=for-the-badge)](https://goreportcard.com/report/muesli/duf)
+> A web monitoring dashboard for [duf](https://github.com/muesli/duf) that adds what the CLI has always been missing: historical tracking, threshold alerts, and a real-time web UI.
 
-Disk Usage/Free Utility (Linux, BSD, macOS & Windows)
+![duf-monitor Dashboard](docs/screenshots/dashboard.png)
 
-![duf](/duf.png)
+## What's New in This Fork
+
+- **Web Dashboard** -- Real-time disk usage monitoring from your browser
+- **Historical tracking** -- SQLite stores snapshots at configurable intervals with 24h sparklines
+- **Threshold alerts** -- Configurable alerts when disks exceed capacity percentages
+- **WebSocket live updates** -- Dashboard refreshes in real-time without polling
+- **Zero config** -- Works out of the box with `psutil`, no duf binary needed
+- **Lightweight** -- Single Python file, minimal dependencies
+
+## Quick Start
+
+```bash
+git clone https://github.com/pueblokc/duf.git
+cd duf
+pip install fastapi "uvicorn[standard]" psutil websockets
+
+python -m uvicorn duf_monitor.app:app --host 0.0.0.0 --port 8503
+# Open http://localhost:8503
+```
+
+## Screenshots
+
+| Dashboard with Sparklines |
+|:---:|
+| ![Dashboard](docs/screenshots/dashboard.png) |
+
+*Each disk shows current usage, total/used/free space, and a 24-hour usage history sparkline.*
 
 ## Features
 
-- [x] User-friendly, colorful output
-- [x] Adjusts to your terminal's theme & width
-- [x] Sort the results according to your needs
-- [x] Groups & filters devices
-- [x] Can conveniently output JSON
+### Real Disk Data
+Uses `psutil` for accurate cross-platform disk readings. Also supports parsing `duf --json` output if the duf binary is available.
+
+### Historical Tracking
+SQLite stores disk snapshots at configurable intervals (default: every 5 minutes). View usage trends over time with per-disk sparkline charts.
+
+### Threshold Alerts
+Set a disk usage percentage threshold (default: 90%). When any disk exceeds it, alerts are generated and optionally sent to a webhook URL.
+
+### WebSocket Live Updates
+The dashboard updates in real-time via WebSocket. No page refreshes, no polling delays.
+
+### Multi-Host Ready
+Architecture supports monitoring multiple hosts. Add remote disk data sources as your infrastructure grows.
+
+### Zero Configuration
+Works immediately with sensible defaults. Install three pip packages and run. No config files, no duf binary required.
+
+## API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Web Dashboard |
+| `GET` | `/api/current` | Current disk usage for all mounts |
+| `GET` | `/api/history/{mountpoint}?hours=24` | Usage history for a specific mount |
+| `GET` | `/api/alerts` | Recent threshold alerts |
+| `POST` | `/api/alerts/{id}/acknowledge` | Acknowledge an alert |
+| `WS` | `/ws` | Real-time disk usage updates |
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DUF_PORT` | `8503` | Server port |
+| `DUF_DB_PATH` | `./duf_monitor.db` | SQLite database path |
+| `DUF_POLL_INTERVAL` | `300` | Seconds between snapshots (default: 5 min) |
+| `DUF_ALERT_THRESHOLD` | `90` | Disk usage % to trigger alerts |
+| `DUF_WEBHOOK_URL` | _(empty)_ | Webhook URL for alert notifications |
+
+## Architecture
+
+```
+duf_monitor/
+├── app.py          # FastAPI backend with WebSocket + alerting
+├── __init__.py
+└── static/
+    └── index.html  # Single-file dashboard with sparkline charts
+```
+
+## Requirements
+
+- Python 3.9+
+- `fastapi`, `uvicorn`, `psutil`, `websockets`
+- Works on Linux, macOS, and Windows
+
+## Docker
+
+```bash
+# Build
+docker build -t duf-monitor .
+
+# Run
+docker run -p 8503:8503 duf-monitor
+```
+
+---
+
+## Original Project
+
+<details>
+<summary>Click to expand original duf README</summary>
+
+# duf
+
+[![Latest Release](https://img.shields.io/github/release/muesli/duf.svg?style=for-the-badge)](https://github.com/muesli/duf/releases)
+[![Software License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](/LICENSE)
+
+Disk Usage/Free Utility (Linux, BSD, macOS & Windows)
+
+## Features
+
+- User-friendly, colorful output
+- Adjusts to your terminal's theme & width
+- Sort the results according to your needs
+- Groups & filters devices
+- Can conveniently output JSON
 
 ## Installation
 
@@ -24,134 +127,56 @@ Disk Usage/Free Utility (Linux, BSD, macOS & Windows)
 
 #### Linux
 - Arch Linux: `pacman -S duf`
-- Ubuntu (22.04 and later) / Debian (12 and later): `apt install duf`
-- Fedora Linux: `dnf install duf`
+- Ubuntu / Debian: `apt install duf`
+- Fedora: `dnf install duf`
 - Nix: `nix-env -iA nixpkgs.duf`
-- Void Linux: `xbps-install -S duf`
-- Gentoo Linux: `emerge sys-fs/duf`
-- Solus: `eopkg it duf`
-- [Packages](https://github.com/muesli/duf/releases) in Alpine, Debian & RPM formats
-
-#### BSD
-- FreeBSD: `pkg install duf`
-- OpenBSD: `pkg_add duf`
 
 #### macOS
-- with [Homebrew](https://brew.sh/): `brew install duf`
-- with [MacPorts](https://www.macports.org): `sudo port selfupdate && sudo port install duf`
+- Homebrew: `brew install duf`
 
 #### Windows
-- with [Chocolatey](https://chocolatey.org/): `choco install duf`
-- with [scoop](https://scoop.sh/): `scoop install duf`
-
-#### Android
-- Android (via termux): `pkg install duf`
-
-### Binaries
-- [Binaries](https://github.com/muesli/duf/releases) for Linux, FreeBSD, OpenBSD, macOS, Windows
+- Chocolatey: `choco install duf`
+- scoop: `scoop install duf`
 
 ### From source
 
-Make sure you have a working Go environment (Go 1.23 or higher is required).
-See the [install instructions](https://golang.org/doc/install.html).
-
-Compiling duf is easy, simply run:
-
-    git clone https://github.com/muesli/duf.git
-    cd duf
-    go build
+```bash
+git clone https://github.com/muesli/duf.git
+cd duf
+go build
+```
 
 ## Usage
 
-You can simply start duf without any command-line arguments:
-
-    duf
-
-If you supply arguments, duf will only list specific devices & mount points:
-
-    duf /home /some/file
-
-If you want to list everything (including pseudo, duplicate, inaccessible file systems):
-
-    duf --all
+```bash
+duf              # Show all disks
+duf /home        # Show specific mount
+duf --all        # Include pseudo filesystems
+duf --json       # Output as JSON
+duf --sort size  # Sort by size
+```
 
 ### Filtering
 
-You can show and hide specific tables:
+```bash
+duf --only local,network
+duf --hide-fs tmpfs,vfat
+duf --only-mp /,/home
+```
 
-    duf --only local,network,fuse,special,loops,binds
-    duf --hide local,network,fuse,special,loops,binds
+### Thresholds
 
-You can also show and hide specific filesystems:
+```bash
+duf --avail-threshold="10G,1G"
+duf --usage-threshold="0.5,0.9"
+```
 
-    duf --only-fs tmpfs,vfat
-    duf --hide-fs tmpfs,vfat
+## License
 
-...or specific mount points:
+MIT
 
-    duf --only-mp /,/home,/dev
-    duf --hide-mp /,/home,/dev
-
-Wildcards inside quotes work:
-
-    duf --only-mp '/sys/*,/dev/*'
-
-### Display options
-
-Sort the output:
-
-    duf --sort size
-
-Valid keys are: `mountpoint`, `size`, `used`, `avail`, `usage`, `inodes`,
-`inodes_used`, `inodes_avail`, `inodes_usage`, `type`, `filesystem`.
-
-Show or hide specific columns:
-
-    duf --output mountpoint,size,usage
-
-Valid keys are: `mountpoint`, `size`, `used`, `avail`, `usage`, `inodes`,
-`inodes_used`, `inodes_avail`, `inodes_usage`, `type`, `filesystem`.
-
-List inode information instead of block usage:
-
-    duf --inodes
-
-If duf doesn't detect your terminal's colors correctly, you can set a theme:
-
-    duf --theme light
-
-### Color-coding & Thresholds
-
-duf highlights the availability & usage columns in red, green, or yellow,
-depending on how much space is still available. You can set your own thresholds:
-
-    duf --avail-threshold="10G,1G"
-    duf --usage-threshold="0.5,0.9"
-
-### Bonus
-
-If you prefer your output as JSON:
-
-    duf --json
-
-## Troubleshooting
-
-Users of `oh-my-zsh` should be aware that it already defines an alias called
-`duf`, which you will have to remove in order to use `duf`:
-
-    unalias duf
-
-## Feedback
-
-Got some feedback or suggestions? Please open an issue or drop me a note!
-
-* [Twitter](https://twitter.com/mueslix)
-* [The Fediverse](https://mastodon.social/@fribbledom)
+</details>
 
 ---
 
-## Fork Maintainer
-
-This fork is maintained by **[KCCS](https://kccsonline.com)** with custom web UI enhancements and monitoring integrations.
-
-*[kccsonline.com](https://kccsonline.com)*
+Developed by **[KCCS](https://kccsonline.com)** | Monitor by [@pueblokc](https://github.com/pueblokc) | [kccsonline.com](https://kccsonline.com)
