@@ -1,0 +1,38 @@
+name: manpage
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  manpage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: 1.23
+
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Build
+        run: go build -v -tags mango
+
+      - name: Generate man-page
+        run: ./duf > duf.1
+
+      - name: Commit
+        uses: stefanzweifel/git-auto-commit-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          commit_message: "docs: update man page"
+          branch: master
+          commit_user_name: mango 🤖
+          commit_user_email: actions@github.com
+          commit_author: mango 🤖 <actions@github.com>

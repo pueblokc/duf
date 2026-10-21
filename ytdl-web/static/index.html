@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ytdl-web — Download Manager</title>
+<style>
+  :root {
+    --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #252525; --border: #333;
+    --text: #f1f1f1; --text2: #aaa; --text3: #666;
+    --red: #ff0000; --red-dim: rgba(255,0,0,0.1);
+    --blue: #3ea6ff; --blue-dim: rgba(62,166,255,0.1);
+    --green: #2ba640; --green-dim: rgba(43,166,64,0.1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Roboto', 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 0; }
+  .header-inner { display: flex; align-items: center; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-play { width: 32px; height: 32px; background: var(--red); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo h1 { font-size: 18px; font-weight: 700; }
+  .logo h1 span { color: var(--red); }
+
+  /* URL Input */
+  .url-section { padding: 32px 0 24px; }
+  .url-box { display: flex; gap: 10px; }
+  .url-input {
+    flex: 1; padding: 14px 16px; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); font-size: 15px; outline: none;
+  }
+  .url-input:focus { border-color: var(--blue); }
+  .url-input::placeholder { color: var(--text3); }
+  .btn {
+    padding: 14px 24px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.15s;
+  }
+  .btn-red { background: var(--red); color: white; }
+  .btn-red:hover { background: #cc0000; }
+  .btn-red:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-blue { background: var(--blue); color: var(--bg); }
+  .btn-blue:hover { background: #2d8fd4; }
+  .btn-sm { padding: 8px 14px; font-size: 12px; border-radius: 8px; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+  .btn-outline:hover { border-color: var(--text2); }
+
+  /* Video Info Card */
+  .info-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 24px; display: none;
+  }
+  .info-card.active { display: block; }
+  .info-top { display: grid; grid-template-columns: 200px 1fr; gap: 20px; }
+  .info-thumb { width: 200px; height: 112px; border-radius: 8px; object-fit: cover; background: var(--bg3); }
+  .info-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .info-meta { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+
+  /* Format picker */
+  .formats-section { margin-top: 16px; }
+  .formats-label { font-size: 13px; color: var(--text2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+  .format-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .preset-chip {
+    padding: 8px 16px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg);
+    color: var(--text2); font-size: 13px; cursor: pointer; transition: all 0.15s;
+  }
+  .preset-chip:hover { border-color: var(--blue); }
+  .preset-chip.active { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+  .format-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;
+    max-height: 200px; overflow-y: auto; margin-bottom: 16px;
+  }
+  .format-option {
+    padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; font-size: 12px; transition: all 0.15s;
+  }
+  .format-option:hover { border-color: var(--blue); }
+  .format-option.selected { border-color: var(--blue); background: var(--blue-dim); }
+  .format-option .label { font-weight: 600; color: var(--text); }
+  .format-option .details { color: var(--text3); margin-top: 2px; }
+
+  .download-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* Queue / Downloads */
+  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .section-title .count { background: var(--bg3); padding: 2px 8px; border-radius: 10px; font-size: 12px; color: var(--text2); }
+
+  .download-list { display: grid; gap: 10px; padding-bottom: 40px; }
+  .dl-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+    display: grid; grid-template-columns: 120px 1fr auto; gap: 16px; align-items: center;
+  }
+  .dl-thumb { width: 120px; height: 68px; border-radius: 6px; object-fit: cover; background: var(--bg3); }
+  .dl-info .title { font-size: 14px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 500px; }
+  .dl-info .meta { font-size: 12px; color: var(--text3); }
+  .dl-info .progress-bar { height: 4px; background: var(--bg); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .dl-info .progress-fill { height: 100%; background: var(--red); border-radius: 2px; transition: width 0.3s; }
+  .dl-info .progress-fill.done { background: var(--green); }
+  .dl-status { text-align: right; min-width: 80px; }
+  .dl-status .pct { font-size: 20px; font-weight: 700; }
+  .dl-status .pct.downloading { color: var(--red); }
+  .dl-status .pct.completed { color: var(--green); }
+  .dl-status .pct.error { color: #f44; }
+  .dl-status .speed { font-size: 11px; color: var(--text3); }
+  .status-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-badge.queued { background: var(--bg3); color: var(--text3); }
+  .status-badge.downloading { background: var(--red-dim); color: var(--red); }
+  .status-badge.completed { background: var(--green-dim); color: var(--green); }
+  .status-badge.error { background: rgba(255,68,68,0.1); color: #f44; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+  .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    .info-top { grid-template-columns: 1fr; }
+    .dl-card { grid-template-columns: 80px 1fr; }
+    .dl-status { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container header-inner">
+    <div class="logo">
+      <div class="logo-play">&#9654;</div>
+      <h1>ytdl<span>-web</span></h1>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <section class="url-section">
+    <div class="url-box">
+      <input type="text" class="url-input" id="urlInput" placeholder="Paste video URL (YouTube, Twitter, TikTok, 1000+ sites)..." autofocus>
+      <button class="btn btn-red" id="fetchBtn" onclick="fetchInfo()">
+        <span id="fetchText">Fetch</span>
+        <span id="fetchLoader" class="loading" style="display:none"></span>
+      </button>
+    </div>
+  </section>
+
+  <div class="info-card" id="infoCard">
+    <div class="info-top">
+      <img class="info-thumb" id="infoThumb" src="" alt="">
+      <div>
+        <div class="info-title" id="infoTitle"></div>
+        <div class="info-meta" id="infoMeta"></div>
+        <div class="formats-section">
+          <div class="formats-label">Quality</div>
+          <div class="format-presets">
+            <div class="preset-chip active" data-format="best" onclick="selectPreset(this)">Best Quality</div>
+            <div class="preset-chip" data-format="bestvideo[height<=1080]+bestaudio/best[height<=1080]" onclick="selectPreset(this)">1080p</div>
+            <div class="preset-chip" data-format="bestvideo[height<=720]+bestaudio/best[height<=720]" onclick="selectPreset(this)">720p</div>
+            <div class="preset-chip" data-format="bestaudio[ext=m4a]/bestaudio" onclick="selectPreset(this)">Audio Only</div>
+          </div>
+          <details>
+            <summary style="font-size: 12px; color: var(--text3); cursor: pointer; margin-bottom: 8px;">All formats</summary>
+            <div class="format-grid" id="formatGrid"></div>
+          </details>
+        </div>
+        <div class="download-actions">
+          <button class="btn btn-blue" onclick="startDownload()">&#11015; Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Downloads <span class="count" id="dlCount">0</span></div>
+  <div class="download-list" id="downloadList">
+    <div class="empty">No downloads yet. Paste a URL above to get started.</div>
+  </div>
+</div>
+
+<script>
+  let currentInfo = null;
+  let selectedFormat = 'best';
+  let selectedFormatLabel = 'Best Quality';
+  let ws = null;
+
+  async function fetchInfo() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+
+    document.getElementById('fetchText').style.display = 'none';
+    document.getElementById('fetchLoader').style.display = 'inline-block';
+    document.getElementById('fetchBtn').disabled = true;
+
+    try {
+      const res = await fetch('/api/info', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url}),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail || 'Failed to fetch info');
+        return;
+      }
+      currentInfo = await res.json();
+      showInfo(currentInfo);
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      document.getElementById('fetchText').style.display = 'inline';
+      document.getElementById('fetchLoader').style.display = 'none';
+      document.getElementById('fetchBtn').disabled = false;
+    }
+  }
+
+  function showInfo(info) {
+    document.getElementById('infoCard').classList.add('active');
+    document.getElementById('infoThumb').src = info.thumbnail || '';
+    document.getElementById('infoTitle').textContent = info.title;
+    document.getElementById('infoMeta').textContent = `${info.uploader || 'Unknown'} • ${info.duration || ''}`;
+
+    const grid = document.getElementById('formatGrid');
+    grid.innerHTML = (info.formats || []).map(f => `
+      <div class="format-option" onclick="selectFormat('${f.format_id}', '${escapeHtml(f.label)}', this)">
+        <div class="label">${escapeHtml(f.label)}</div>
+        <div class="details">${f.resolution || ''} ${f.type || ''} ${f.filesize ? formatBytes(f.filesize) : ''}</div>
+      </div>
+    `).join('');
+
+    // Reset to best
+    selectedFormat = 'best';
+    selectedFormatLabel = 'Best Quality';
+    document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('.preset-chip[data-format="best"]').classList.add('active');
+  }
+
+  function selectPreset(el) {
+    document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.format-option').forEach(c => c.classList.remove('selected'));
+    el.classList.add('active');
+    selectedFormat = el.dataset.format;
+    selectedFormatLabel = el.textContent;
+  }
+
+  function selectFormat(formatId, label, el) {
+    document.querySelectorAll('.format-option').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('selected');
+    selectedFormat = formatId;
+    selectedFormatLabel = label;
+  }
+
+  async function startDownload() {
+    if (!currentInfo) return;
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          url: currentInfo.url,
+          title: currentInfo.title,
+          thumbnail: currentInfo.thumbnail,
+          format_id: selectedFormat,
+          format_label: selectedFormatLabel,
+        }),
+      });
+      const data = await res.json();
+      document.getElementById('infoCard').classList.remove('active');
+      document.getElementById('urlInput').value = '';
+      currentInfo = null;
+      loadDownloads();
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
+  async function loadDownloads() {
+    try {
+      const res = await fetch('/api/downloads?limit=50');
+      const downloads = await res.json();
+      renderDownloads(downloads);
+    } catch (e) {}
+  }
+
+  function renderDownloads(downloads) {
+    document.getElementById('dlCount').textContent = downloads.length;
+    const list = document.getElementById('downloadList');
+    if (!downloads.length) {
+      list.innerHTML = '<div class="empty">No downloads yet. Paste a URL above to get started.</div>';
+      return;
+    }
+    list.innerHTML = downloads.map(dl => {
+      const pctClass = dl.status === 'completed' ? 'completed' : dl.status === 'error' ? 'error' : 'downloading';
+      const barClass = dl.status === 'completed' ? 'done' : '';
+      return `
+        <div class="dl-card" id="dl-${dl.id}">
+          <img class="dl-thumb" src="${dl.thumbnail || ''}" alt="" onerror="this.style.display='none'">
+          <div class="dl-info">
+            <div class="title">${escapeHtml(dl.title || 'Unknown')}</div>
+            <div class="meta">
+              <span class="status-badge ${dl.status}">${dl.status}</span>
+              ${dl.format_label ? ' &bull; ' + escapeHtml(dl.format_label) : ''}
+              ${dl.filesize ? ' &bull; ' + formatBytes(dl.filesize) : ''}
+            </div>
+            ${dl.status === 'downloading' ? `
+              <div class="progress-bar"><div class="progress-fill" style="width: ${dl.progress || 0}%"></div></div>
+            ` : dl.status === 'completed' ? `
+              <div class="progress-bar"><div class="progress-fill done" style="width: 100%"></div></div>
+            ` : ''}
+          </div>
+          <div class="dl-status">
+            ${dl.status === 'downloading' ? `
+              <div class="pct downloading">${Math.round(dl.progress || 0)}%</div>
+              <div class="speed">${dl.speed || ''} ${dl.eta ? 'ETA ' + dl.eta : ''}</div>
+            ` : dl.status === 'completed' ? `
+              <div class="pct completed">&#10003;</div>
+            ` : dl.status === 'error' ? `
+              <div class="pct error">&#10007;</div>
+            ` : `
+              <div class="pct">&#8987;</div>
+            `}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function connectWS() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}/ws`);
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'progress') {
+        updateProgress(data.task_id, data.progress, data.speed, data.eta);
+      } else if (data.type === 'completed' || data.type === 'error' || data.type === 'queued') {
+        loadDownloads();
+      }
+    };
+    ws.onclose = () => setTimeout(connectWS, 3000);
+    ws.onerror = () => ws.close();
+  }
+
+  function updateProgress(taskId, progress, speed, eta) {
+    const card = document.getElementById('dl-' + taskId);
+    if (!card) return;
+    const pctEl = card.querySelector('.pct');
+    if (pctEl) pctEl.textContent = Math.round(progress) + '%';
+    const speedEl = card.querySelector('.speed');
+    if (speedEl) speedEl.textContent = `${speed || ''} ${eta ? 'ETA ' + eta : ''}`;
+    const fill = card.querySelector('.progress-fill');
+    if (fill) fill.style.width = progress + '%';
+  }
+
+  function formatBytes(b) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (Math.abs(b) >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+    return b.toFixed(1) + ' ' + units[i];
+  }
+
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+  document.getElementById('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') fetchInfo(); });
+
+  loadDownloads();
+  connectWS();
+</script>
+<footer style="text-align:center;padding:16px 0;margin-top:32px;border-top:1px solid var(--border);color:var(--text3);font-size:13px;">
+  Developed by <a href="https://kccsonline.com" target="_blank" style="color:var(--text2);text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:var(--text3);text-decoration:none;">kccsonline.com</a>
+</footer>
+</body>
+</html>

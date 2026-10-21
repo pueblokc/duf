@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>changedetection.io — UX Companion</title>
+<style>
+/* ===================================================================
+   CSS Reset & Variables
+   =================================================================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2333;
+  --bg-hover: #21262d;
+  --bg-active: #292e36;
+  --border: #30363d;
+  --border-light: #3a424c;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-yellow: #d29922;
+  --accent-orange: #db6d28;
+  --accent-red: #f85149;
+  --accent-purple: #bc8cff;
+  --accent-pink: #f778ba;
+  --status-ok: #3fb950;
+  --status-changed: #d29922;
+  --status-error: #f85149;
+  --status-paused: #6e7681;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+  --transition: 150ms ease;
+  --sidebar-width: 260px;
+}
+
+html { font-size: 14px; }
+body {
+  font-family: var(--font);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow: hidden;
+  height: 100vh;
+}
+
+a { color: var(--accent-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; font-family: var(--font); }
+input, select, textarea { font-family: var(--font); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ===================================================================
+   Layout
+   =================================================================== */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.top-bar .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.top-bar .logo svg { flex-shrink: 0; }
+
+.stats-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.stat-chip:hover { border-color: var(--accent-blue); background: var(--bg-hover); }
+.stat-chip .stat-value { font-weight: 700; font-size: 1rem; }
+.stat-chip .stat-label { color: var(--text-secondary); }
+.stat-chip.green .stat-value { color: var(--accent-green); }
+.stat-chip.yellow .stat-value { color: var(--accent-yellow); }
+.stat-chip.red .stat-value { color: var(--accent-red); }
+.stat-chip.gray .stat-value { color: var(--text-muted); }
+.stat-chip.blue .stat-value { color: var(--accent-blue); }
+
+.top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===================================================================
+   Sidebar
+   =================================================================== */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+  transition: width var(--transition), transform var(--transition);
+}
+
+.sidebar-header {
+  padding: 14px 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-header h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.sidebar-list { padding: 6px 8px; flex: 1; }
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition);
+  user-select: none;
+  font-size: 0.9rem;
+}
+.folder-item:hover { background: var(--bg-hover); }
+.folder-item.active { background: var(--bg-active); color: var(--accent-blue); }
+
+.folder-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.folder-badge {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.sidebar-section-title {
+  padding: 16px 12px 6px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.tag-cloud {
+  padding: 6px 12px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.tag-pill:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+.tag-pill.active { border-color: var(--accent-purple); color: var(--accent-purple); background: rgba(188,140,255,0.1); }
+.tag-pill .tag-count { font-weight: 600; color: var(--text-muted); font-size: 0.7rem; }
+
+/* ===================================================================
+   Watch list area
+   =================================================================== */
+.watch-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.watch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.search-box {
+  flex: 1;
+  max-width: 400px;
+  position: relative;
+}
+.search-box input {
+  width: 100%;
+  padding: 7px 12px 7px 34px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.search-box input:focus { border-color: var(--accent-blue); }
+.search-box input::placeholder { color: var(--text-muted); }
+.search-box .search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.search-box .search-shortcut {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.toolbar-divider { width: 1px; height: 24px; background: var(--border); }
+
+.view-toggle {
+  display: flex;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.view-toggle button {
+  padding: 5px 10px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+}
+.view-toggle button.active { background: var(--bg-active); color: var(--accent-blue); }
+.view-toggle button:hover:not(.active) { color: var(--text-secondary); }
+
+.filter-chips {
+  display: flex;
+  gap: 4px;
+}
+.filter-chip {
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.filter-chip:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+.filter-chip.active { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(88,166,255,0.08); }
+
+/* Bulk action bar */
+.bulk-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(88,166,255,0.08);
+  border-bottom: 1px solid var(--accent-blue);
+  flex-shrink: 0;
+}
+.bulk-bar.visible { display: flex; }
+.bulk-bar .bulk-count {
+  font-weight: 600;
+  color: var(--accent-blue);
+  white-space: nowrap;
+}
+.bulk-bar .bulk-actions { display: flex; gap: 6px; flex: 1; }
+
+/* Watch list */
+.watch-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Row view */
+.watch-row {
+  display: grid;
+  grid-template-columns: 32px 10px 1fr auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.watch-row:hover { border-color: var(--border-light); background: var(--bg-elevated); }
+.watch-row.selected { border-color: var(--accent-blue); background: rgba(88,166,255,0.05); }
+
+.watch-row .checkbox {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border-light);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.watch-row.selected .checkbox {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+.watch-row.selected .checkbox::after {
+  content: '';
+  width: 8px; height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.ok { background: var(--status-ok); box-shadow: 0 0 6px rgba(63,185,80,0.4); }
+.status-dot.changed { background: var(--status-changed); box-shadow: 0 0 6px rgba(210,153,34,0.4); }
+.status-dot.error { background: var(--status-error); box-shadow: 0 0 6px rgba(248,81,73,0.4); }
+.status-dot.paused { background: var(--status-paused); }
+
+.watch-info { overflow: hidden; }
+.watch-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.watch-url {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watch-tags {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.watch-tag {
+  padding: 1px 8px;
+  background: var(--bg-active);
+  border-radius: 10px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.watch-meta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-align: right;
+}
+.watch-meta .meta-label { color: var(--text-muted); font-size: 0.7rem; }
+
+.watch-changes-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 8px;
+  background: var(--bg-active);
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Card view */
+.watch-list.card-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.watch-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.watch-card:hover { border-color: var(--border-light); transform: translateY(-1px); box-shadow: var(--shadow); }
+.watch-card.selected { border-color: var(--accent-blue); }
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.card-header .checkbox { flex-shrink: 0; margin-top: 2px; }
+.card-header .watch-info { flex: 1; overflow: hidden; }
+.card-status { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.card-status .status-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; }
+.card-status .status-label.ok { color: var(--status-ok); }
+.card-status .status-label.changed { color: var(--status-changed); }
+.card-status .status-label.error { color: var(--status-error); }
+.card-status .status-label.paused { color: var(--status-paused); }
+
+.card-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* ===================================================================
+   Detail panel
+   =================================================================== */
+.detail-panel {
+  width: 0;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  transition: width 200ms ease;
+  flex-shrink: 0;
+}
+.detail-panel.open { width: 440px; }
+
+.detail-content { padding: 20px; min-width: 420px; }
+
+.detail-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.detail-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.detail-header-info { flex: 1; }
+.detail-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; word-break: break-word; }
+.detail-url { font-size: 0.82rem; color: var(--accent-blue); word-break: break-all; }
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.meta-card {
+  padding: 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.meta-card .meta-card-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.meta-card .meta-card-value { font-size: 1rem; font-weight: 600; }
+
+.detail-section { margin-bottom: 20px; }
+.detail-section-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.detail-notes textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  resize: vertical;
+  outline: none;
+}
+.detail-notes textarea:focus { border-color: var(--accent-blue); }
+
+/* Diff view */
+.change-entry {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.change-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.change-entry-diff {
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  background: var(--bg-base);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.diff-line { padding: 1px 4px; border-radius: 2px; }
+.diff-line.context { color: var(--text-secondary); }
+.diff-line.header { color: var(--accent-purple); }
+.diff-line.removed { background: rgba(248,81,73,0.12); color: #ffa198; }
+.diff-line.added { background: rgba(63,185,80,0.12); color: #7ee787; }
+
+/* ===================================================================
+   Buttons
+   =================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn:hover { background: var(--bg-hover); border-color: var(--border-light); }
+
+.btn-primary {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+.btn-primary:hover { background: #4c94e8; }
+
+.btn-danger { color: var(--accent-red); }
+.btn-danger:hover { background: rgba(248,81,73,0.1); border-color: var(--accent-red); }
+
+.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  padding: 0;
+}
+.btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===================================================================
+   Modal
+   =================================================================== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.visible { display: flex; }
+
+.modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 520px;
+  box-shadow: var(--shadow-lg);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 { font-size: 1.05rem; font-weight: 700; }
+.modal-body { padding: 20px; }
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+}
+.form-group input:focus,
+.form-group select:focus { border-color: var(--accent-blue); }
+.form-group input::placeholder { color: var(--text-muted); }
+
+.form-group .tag-input-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  min-height: 38px;
+  align-items: center;
+  cursor: text;
+}
+.form-group .tag-input-wrapper:focus-within { border-color: var(--accent-blue); }
+.form-group .tag-input-wrapper input {
+  border: none;
+  background: none;
+  padding: 2px;
+  flex: 1;
+  min-width: 80px;
+}
+.form-group .tag-input-wrapper input:focus { border-color: transparent; }
+
+.inline-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--bg-active);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.inline-tag .remove-tag {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 700;
+  line-height: 1;
+}
+.inline-tag .remove-tag:hover { color: var(--accent-red); }
+
+/* ===================================================================
+   Toast
+   =================================================================== */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  padding: 10px 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn 200ms ease;
+}
+.toast.success { border-left: 3px solid var(--accent-green); }
+.toast.error { border-left: 3px solid var(--accent-red); }
+.toast.info { border-left: 3px solid var(--accent-blue); }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ===================================================================
+   Footer
+   =================================================================== */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.app-footer a { color: var(--text-secondary); }
+.app-footer a:hover { color: var(--accent-blue); }
+
+/* ===================================================================
+   Responsive
+   =================================================================== */
+@media (max-width: 900px) {
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 200; transform: translateX(-100%); }
+  .sidebar.mobile-open { transform: translateX(0); box-shadow: var(--shadow-lg); }
+  .detail-panel.open { width: 100%; position: fixed; left: 0; top: 0; bottom: 0; z-index: 300; }
+  .stat-chip .stat-label { display: none; }
+  .watch-row { grid-template-columns: 32px 10px 1fr auto; }
+  .watch-tags, .watch-meta { display: none; }
+}
+
+@media (max-width: 600px) {
+  .top-bar { padding: 8px 12px; gap: 8px; }
+  .top-bar .logo span { display: none; }
+  .stats-row { gap: 4px; }
+  .stat-chip { padding: 3px 8px; font-size: 0.78rem; }
+  .watch-list.card-view { grid-template-columns: 1fr; }
+}
+
+/* ===================================================================
+   Empty state
+   =================================================================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.empty-state svg { margin-bottom: 16px; opacity: 0.4; }
+.empty-state h3 { color: var(--text-secondary); margin-bottom: 6px; }
+
+/* Keyboard shortcut hint */
+.kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ============ Top bar ============ -->
+  <div class="top-bar">
+    <div class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>changedetection.io</span>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-chip blue" onclick="filterByStatus(null)" title="Total watches">
+        <span class="stat-value" id="stat-total">0</span>
+        <span class="stat-label">Watches</span>
+      </div>
+      <div class="stat-chip yellow" onclick="filterByStatus('changed')" title="Changed today">
+        <span class="stat-value" id="stat-changes">0</span>
+        <span class="stat-label">Changed</span>
+      </div>
+      <div class="stat-chip red" onclick="filterByStatus('error')" title="Errors">
+        <span class="stat-value" id="stat-errors">0</span>
+        <span class="stat-label">Errors</span>
+      </div>
+      <div class="stat-chip gray" onclick="filterByStatus('paused')" title="Paused">
+        <span class="stat-value" id="stat-paused">0</span>
+        <span class="stat-label">Paused</span>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn btn-primary" onclick="openAddModal()" title="Add watch (N)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Watch
+      </button>
+      <button class="btn-icon" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <!-- ============ Sidebar ============ -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>Folders</h3>
+        <button class="btn-icon" onclick="openAddFolderModal()" title="New folder" style="width:26px;height:26px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="sidebar-list" id="folder-list"></div>
+
+      <div class="sidebar-section-title">Top Tags</div>
+      <div class="tag-cloud" id="tag-cloud"></div>
+    </div>
+
+    <!-- ============ Watch area ============ -->
+    <div class="watch-area">
+      <div class="watch-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="Search watches..." />
+          <span class="search-shortcut">/</span>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="filter-chips">
+          <button class="filter-chip active" data-status="" onclick="filterByStatus(null)">All</button>
+          <button class="filter-chip" data-status="ok" onclick="filterByStatus('ok')">OK</button>
+          <button class="filter-chip" data-status="changed" onclick="filterByStatus('changed')">Changed</button>
+          <button class="filter-chip" data-status="error" onclick="filterByStatus('error')">Error</button>
+          <button class="filter-chip" data-status="paused" onclick="filterByStatus('paused')">Paused</button>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="view-toggle">
+          <button class="active" id="btn-row-view" onclick="setView('row')" title="Row view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+          <button id="btn-card-view" onclick="setView('card')" title="Card view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bulk action bar -->
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="bulk-count"><span id="bulk-count-num">0</span> selected</span>
+        <div class="bulk-actions">
+          <button class="btn btn-sm" onclick="bulkMoveFolder()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Move
+          </button>
+          <button class="btn btn-sm" onclick="bulkAddTag()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            Tag
+          </button>
+          <button class="btn btn-sm" onclick="bulkAction('pause')">Pause</button>
+          <button class="btn btn-sm" onclick="bulkAction('resume')">Resume</button>
+          <button class="btn btn-sm btn-danger" onclick="bulkAction('delete')">Delete</button>
+        </div>
+        <button class="btn btn-sm" onclick="clearSelection()">Clear</button>
+      </div>
+
+      <!-- Watch list -->
+      <div class="watch-list" id="watch-list"></div>
+    </div>
+
+    <!-- ============ Detail panel ============ -->
+    <div class="detail-panel" id="detail-panel">
+      <div class="detail-content" id="detail-content"></div>
+    </div>
+  </div>
+
+  <!-- ============ Footer ============ -->
+  <div class="app-footer">
+    <span>UX Companion for changedetection.io</span>
+    <span>&middot;</span>
+    <span>Built by <a href="https://kccsonline.com" target="_blank">KCCS</a></span>
+  </div>
+</div>
+
+<!-- ============ Add Watch Modal ============ -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add New Watch</h2>
+      <button class="detail-close" onclick="closeAddModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>URL to monitor</label>
+        <input type="url" id="add-url" placeholder="https://example.com/page" autofocus />
+      </div>
+      <div class="form-group">
+        <label>Title (optional)</label>
+        <input type="text" id="add-title" placeholder="My Watch" />
+      </div>
+      <div class="form-group">
+        <label>Check interval</label>
+        <select id="add-interval">
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
+          <option value="900">15 minutes</option>
+          <option value="1800">30 minutes</option>
+          <option value="3600" selected>1 hour</option>
+          <option value="7200">2 hours</option>
+          <option value="14400">4 hours</option>
+          <option value="43200">12 hours</option>
+          <option value="86400">24 hours</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Folder</label>
+        <select id="add-folder"></select>
+      </div>
+      <div class="form-group">
+        <label>Tags (press Enter to add)</label>
+        <div class="tag-input-wrapper" id="add-tags-wrapper">
+          <input type="text" id="add-tags-input" placeholder="Add tag..." />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddWatch()">Add Watch</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Add Folder Modal ============ -->
+<div class="modal-overlay" id="add-folder-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Create Folder</h2>
+      <button class="detail-close" onclick="closeAddFolderModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Folder name</label>
+        <input type="text" id="folder-name" placeholder="My Folder" />
+      </div>
+      <div class="form-group">
+        <label>Color</label>
+        <input type="color" id="folder-color" value="#3b82f6" style="width:60px;height:34px;padding:2px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);cursor:pointer;" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddFolderModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddFolder()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ===================================================================
+   State
+   =================================================================== */
+let watches = [];
+let folders = [];
+let stats = {};
+let selectedIds = new Set();
+let activeFolder = null;
+let activeTag = null;
+let activeStatus = null;
+let searchQuery = '';
+let viewMode = 'row';
+let detailWatchId = null;
+let addModalTags = [];
+
+/* ===================================================================
+   API helpers
+   =================================================================== */
+const API = {
+  async get(url) {
+    const r = await fetch(url);
+    return r.json();
+  },
+  async post(url, body) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return r.json();
+  },
+  async put(url, body) {
+    const r = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return r.json();
+  },
+  async del(url) {
+    const r = await fetch(url, { method: 'DELETE' });
+    return r.json();
+  }
+};
+
+/* ===================================================================
+   Data loading
+   =================================================================== */
+async function loadAll() {
+  [watches, folders, stats] = await Promise.all([
+    API.get('/api/watches'),
+    API.get('/api/folders'),
+    API.get('/api/stats')
+  ]);
+  renderStats();
+  renderFolders();
+  renderTagCloud();
+  renderWatches();
+}
+
+/* ===================================================================
+   Rendering — Stats
+   =================================================================== */
+function renderStats() {
+  document.getElementById('stat-total').textContent = stats.total_watches || 0;
+  document.getElementById('stat-changes').textContent = stats.changes_today || 0;
+  document.getElementById('stat-errors').textContent = stats.errored || 0;
+  document.getElementById('stat-paused').textContent = stats.paused || 0;
+}
+
+/* ===================================================================
+   Rendering — Folders
+   =================================================================== */
+function renderFolders() {
+  const el = document.getElementById('folder-list');
+  const totalCount = watches.length;
+  const unfoldered = watches.filter(w => !w.folder_id).length;
+
+  let html = `
+    <div class="folder-item ${activeFolder === null ? 'active' : ''}" onclick="selectFolder(null)">
+      <div class="folder-dot" style="background:var(--accent-blue)"></div>
+      <span class="folder-name">All Watches</span>
+      <span class="folder-badge">${totalCount}</span>
+    </div>
+  `;
+
+  for (const f of folders) {
+    const isActive = activeFolder === f.id;
+    html += `
+      <div class="folder-item ${isActive ? 'active' : ''}" onclick="selectFolder('${f.id}')">
+        <div class="folder-dot" style="background:${f.color || '#3b82f6'}"></div>
+        <span class="folder-name">${esc(f.name)}</span>
+        <span class="folder-badge">${f.watch_count}</span>
+      </div>
+    `;
+  }
+
+  if (unfoldered > 0) {
+    html += `
+      <div class="folder-item ${activeFolder === '__none__' ? 'active' : ''}" onclick="selectFolder('__none__')">
+        <div class="folder-dot" style="background:var(--text-muted)"></div>
+        <span class="folder-name">Unfiled</span>
+        <span class="folder-badge">${unfoldered}</span>
+      </div>
+    `;
+  }
+
+  el.innerHTML = html;
+}
+
+/* ===================================================================
+   Rendering — Tag cloud
+   =================================================================== */
+function renderTagCloud() {
+  const el = document.getElementById('tag-cloud');
+  if (!stats.top_tags || stats.top_tags.length === 0) {
+    el.innerHTML = '<span style="color:var(--text-muted);font-size:0.78rem;">No tags yet</span>';
+    return;
+  }
+  el.innerHTML = stats.top_tags.map(t => `
+    <span class="tag-pill ${activeTag === t.tag ? 'active' : ''}" onclick="selectTag('${esc(t.tag)}')">
+      ${esc(t.tag)}
+      <span class="tag-count">${t.count}</span>
+    </span>
+  `).join('');
+}
+
+/* ===================================================================
+   Rendering — Watch list
+   =================================================================== */
+function getFilteredWatches() {
+  let list = [...watches];
+
+  if (activeFolder === '__none__') {
+    list = list.filter(w => !w.folder_id);
+  } else if (activeFolder) {
+    list = list.filter(w => w.folder_id === activeFolder);
+  }
+
+  if (activeTag) {
+    list = list.filter(w => w.tags && w.tags.includes(activeTag));
+  }
+
+  if (activeStatus) {
+    list = list.filter(w => w.status === activeStatus);
+  }
+
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(w =>
+      (w.title || '').toLowerCase().includes(q) ||
+      (w.url || '').toLowerCase().includes(q) ||
+      (w.tags || []).some(t => t.toLowerCase().includes(q))
+    );
+  }
+
+  return list;
+}
+
+function renderWatches() {
+  const el = document.getElementById('watch-list');
+  const filtered = getFilteredWatches();
+
+  if (filtered.length === 0) {
+    el.className = 'watch-list';
+    el.innerHTML = `
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3>No watches found</h3>
+        <p>Try adjusting your filters or add a new watch.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (viewMode === 'card') {
+    el.className = 'watch-list card-view';
+    el.innerHTML = filtered.map(w => renderCardItem(w)).join('');
+  } else {
+    el.className = 'watch-list';
+    el.innerHTML = filtered.map(w => renderRowItem(w)).join('');
+  }
+
+  updateBulkBar();
+}
+
+function renderRowItem(w) {
+  const sel = selectedIds.has(w.id);
+  const tagHtml = (w.tags || []).slice(0, 3).map(t => `<span class="watch-tag">${esc(t)}</span>`).join('');
+  const moreTag = (w.tags || []).length > 3 ? `<span class="watch-tag">+${w.tags.length - 3}</span>` : '';
+
+  return `
+    <div class="watch-row ${sel ? 'selected' : ''}" data-id="${w.id}"
+         onclick="handleRowClick(event, '${w.id}')"
+         ondblclick="openDetail('${w.id}')">
+      <div class="checkbox" onclick="event.stopPropagation(); toggleSelect('${w.id}')"></div>
+      <div class="status-dot ${w.status}"></div>
+      <div class="watch-info">
+        <div class="watch-title">${esc(w.title || w.url)}</div>
+        <div class="watch-url">${esc(truncUrl(w.url))}</div>
+      </div>
+      <div class="watch-tags">${tagHtml}${moreTag}</div>
+      <div class="watch-meta">
+        <div class="meta-label">Last changed</div>
+        ${timeAgo(w.last_changed)}
+      </div>
+      <div class="watch-changes-badge" title="${w.change_count} changes">${w.change_count}</div>
+    </div>
+  `;
+}
+
+function renderCardItem(w) {
+  const sel = selectedIds.has(w.id);
+  const tagHtml = (w.tags || []).slice(0, 4).map(t => `<span class="watch-tag">${esc(t)}</span>`).join('');
+
+  return `
+    <div class="watch-card ${sel ? 'selected' : ''}" data-id="${w.id}"
+         onclick="handleRowClick(event, '${w.id}')"
+         ondblclick="openDetail('${w.id}')">
+      <div class="card-header">
+        <div class="checkbox" onclick="event.stopPropagation(); toggleSelect('${w.id}')"></div>
+        <div class="watch-info">
+          <div class="watch-title">${esc(w.title || w.url)}</div>
+          <div class="watch-url">${esc(truncUrl(w.url))}</div>
+        </div>
+      </div>
+      <div class="card-status">
+        <div class="status-dot ${w.status}"></div>
+        <span class="status-label ${w.status}">${w.status.toUpperCase()}</span>
+      </div>
+      <div class="watch-tags">${tagHtml}</div>
+      <div class="card-meta-row">
+        <span style="font-size:0.78rem;color:var(--text-secondary)">Changed ${timeAgo(w.last_changed)}</span>
+        <div class="watch-changes-badge">${w.change_count}</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ===================================================================
+   Detail panel
+   =================================================================== */
+async function openDetail(id) {
+  detailWatchId = id;
+  const w = watches.find(x => x.id === id);
+  if (!w) return;
+
+  const changes = await API.get(`/api/changes/${id}?limit=10`);
+  const folder = folders.find(f => f.id === w.folder_id);
+
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+
+  const tagHtml = (w.tags || []).map(t => `<span class="watch-tag">${esc(t)}</span>`).join('') || '<span style="color:var(--text-muted)">No tags</span>';
+
+  const changesHtml = changes.map(c => {
+    const lines = (c.diff_text || '').split('\n').map(line => {
+      if (line.startsWith('@@')) return `<div class="diff-line header">${esc(line)}</div>`;
+      if (line.startsWith('-')) return `<div class="diff-line removed">${esc(line)}</div>`;
+      if (line.startsWith('+')) return `<div class="diff-line added">${esc(line)}</div>`;
+      return `<div class="diff-line context">${esc(line)}</div>`;
+    }).join('');
+
+    return `
+      <div class="change-entry">
+        <div class="change-entry-header">
+          <span>${formatDate(c.timestamp)}</span>
+        </div>
+        <div class="change-entry-diff">${lines}</div>
+      </div>
+    `;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-header-info">
+        <div class="detail-title">${esc(w.title || w.url)}</div>
+        <a class="detail-url" href="${esc(w.url)}" target="_blank">${esc(w.url)}</a>
+      </div>
+      <button class="detail-close" onclick="closeDetail()">&times;</button>
+    </div>
+
+    <div class="detail-meta">
+      <div class="meta-card">
+        <div class="meta-card-label">Status</div>
+        <div class="meta-card-value" style="color:var(--status-${w.status})">${w.status.toUpperCase()}</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-card-label">Changes</div>
+        <div class="meta-card-value">${w.change_count}</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-card-label">Last Checked</div>
+        <div class="meta-card-value" style="font-size:0.85rem">${timeAgo(w.last_checked)}</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-card-label">Interval</div>
+        <div class="meta-card-value" style="font-size:0.85rem">${formatInterval(w.check_interval)}</div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Folder</div>
+      <div style="color:${folder ? folder.color : 'var(--text-muted)'}">${folder ? esc(folder.name) : 'Unfiled'}</div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Tags</div>
+      <div class="detail-tags">${tagHtml}</div>
+    </div>
+
+    <div class="detail-section detail-notes">
+      <div class="detail-section-title">Notes</div>
+      <textarea id="detail-notes" placeholder="Add notes about this watch..."
+                onblur="saveNotes('${w.id}')">${esc(w.notes || '')}</textarea>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Recent Changes (${changes.length})</div>
+      ${changesHtml || '<div style="color:var(--text-muted);font-size:0.85rem">No changes recorded yet.</div>'}
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-danger btn-sm" onclick="deleteWatch('${w.id}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Delete
+      </button>
+    </div>
+  `;
+
+  panel.classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  detailWatchId = null;
+}
+
+async function saveNotes(id) {
+  const notes = document.getElementById('detail-notes')?.value || '';
+  await API.put(`/api/watches/${id}`, { notes });
+  const w = watches.find(x => x.id === id);
+  if (w) w.notes = notes;
+}
+
+/* ===================================================================
+   Selection & Bulk
+   =================================================================== */
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  renderWatches();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  renderWatches();
+}
+
+function handleRowClick(e, id) {
+  if (e.target.closest('.checkbox')) return;
+  if (e.shiftKey) {
+    toggleSelect(id);
+  } else {
+    openDetail(id);
+  }
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const num = document.getElementById('bulk-count-num');
+  if (selectedIds.size > 0) {
+    bar.classList.add('visible');
+    num.textContent = selectedIds.size;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+async function bulkAction(action) {
+  if (selectedIds.size === 0) return;
+  if (action === 'delete' && !confirm(`Delete ${selectedIds.size} watches?`)) return;
+  await API.post('/api/bulk', { watch_ids: [...selectedIds], action });
+  selectedIds.clear();
+  toast(`Bulk ${action} completed`, 'success');
+  await loadAll();
+}
+
+async function bulkMoveFolder() {
+  const folderId = prompt('Enter folder name to move to (or leave blank for unfiled):');
+  if (folderId === null) return;
+  const folder = folders.find(f => f.name.toLowerCase() === folderId.toLowerCase());
+  await API.post('/api/bulk', {
+    watch_ids: [...selectedIds],
+    action: 'move_folder',
+    value: folder ? folder.id : ''
+  });
+  selectedIds.clear();
+  toast('Moved to folder', 'success');
+  await loadAll();
+}
+
+async function bulkAddTag() {
+  const tag = prompt('Enter tag to add:');
+  if (!tag) return;
+  await API.post('/api/bulk', {
+    watch_ids: [...selectedIds],
+    action: 'add_tag',
+    value: tag.trim()
+  });
+  selectedIds.clear();
+  toast(`Tag "${tag}" added`, 'success');
+  await loadAll();
+}
+
+/* ===================================================================
+   Filters
+   =================================================================== */
+function selectFolder(id) {
+  activeFolder = id;
+  renderFolders();
+  renderWatches();
+}
+
+function selectTag(tag) {
+  activeTag = activeTag === tag ? null : tag;
+  renderTagCloud();
+  renderWatches();
+}
+
+function filterByStatus(status) {
+  activeStatus = activeStatus === status ? null : status;
+  document.querySelectorAll('.filter-chip').forEach(el => {
+    el.classList.toggle('active', (el.dataset.status || '') === (activeStatus || ''));
+  });
+  renderWatches();
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('btn-row-view').classList.toggle('active', mode === 'row');
+  document.getElementById('btn-card-view').classList.toggle('active', mode === 'card');
+  renderWatches();
+}
+
+/* ===================================================================
+   Add Watch Modal
+   =================================================================== */
+function openAddModal() {
+  addModalTags = [];
+  document.getElementById('add-url').value = '';
+  document.getElementById('add-title').value = '';
+  document.getElementById('add-interval').value = '3600';
+  renderAddFolderSelect();
+  renderAddTags();
+  document.getElementById('add-modal').classList.add('visible');
+  setTimeout(() => document.getElementById('add-url').focus(), 100);
+}
+
+function closeAddModal() {
+  document.getElementById('add-modal').classList.remove('visible');
+}
+
+function renderAddFolderSelect() {
+  const sel = document.getElementById('add-folder');
+  sel.innerHTML = '<option value="">No folder</option>' +
+    folders.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
+}
+
+function renderAddTags() {
+  const wrapper = document.getElementById('add-tags-wrapper');
+  const input = document.getElementById('add-tags-input');
+  wrapper.querySelectorAll('.inline-tag').forEach(el => el.remove());
+  addModalTags.forEach(t => {
+    const span = document.createElement('span');
+    span.className = 'inline-tag';
+    span.innerHTML = `${esc(t)} <span class="remove-tag" onclick="removeAddTag('${esc(t)}')">&times;</span>`;
+    wrapper.insertBefore(span, input);
+  });
+}
+
+function removeAddTag(tag) {
+  addModalTags = addModalTags.filter(t => t !== tag);
+  renderAddTags();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('add-tags-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = e.target.value.trim();
+      if (val && !addModalTags.includes(val)) {
+        addModalTags.push(val);
+        renderAddTags();
+      }
+      e.target.value = '';
+    }
+  });
+});
+
+async function submitAddWatch() {
+  const url = document.getElementById('add-url').value.trim();
+  if (!url) { toast('URL is required', 'error'); return; }
+  const data = {
+    url,
+    title: document.getElementById('add-title').value.trim() || null,
+    check_interval: parseInt(document.getElementById('add-interval').value),
+    folder_id: document.getElementById('add-folder').value || null,
+    tags: addModalTags
+  };
+  await API.post('/api/watches', data);
+  closeAddModal();
+  toast('Watch added', 'success');
+  await loadAll();
+}
+
+/* ===================================================================
+   Add Folder Modal
+   =================================================================== */
+function openAddFolderModal() {
+  document.getElementById('folder-name').value = '';
+  document.getElementById('folder-color').value = '#3b82f6';
+  document.getElementById('add-folder-modal').classList.add('visible');
+  setTimeout(() => document.getElementById('folder-name').focus(), 100);
+}
+
+function closeAddFolderModal() {
+  document.getElementById('add-folder-modal').classList.remove('visible');
+}
+
+async function submitAddFolder() {
+  const name = document.getElementById('folder-name').value.trim();
+  if (!name) { toast('Name is required', 'error'); return; }
+  await API.post('/api/folders', {
+    name,
+    color: document.getElementById('folder-color').value
+  });
+  closeAddFolderModal();
+  toast('Folder created', 'success');
+  await loadAll();
+}
+
+/* ===================================================================
+   Delete watch
+   =================================================================== */
+async function deleteWatch(id) {
+  if (!confirm('Delete this watch?')) return;
+  await API.del(`/api/watches/${id}`);
+  closeDetail();
+  toast('Watch deleted', 'success');
+  await loadAll();
+}
+
+/* ===================================================================
+   Sidebar toggle
+   =================================================================== */
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  if (window.innerWidth <= 900) {
+    sb.classList.toggle('mobile-open');
+  } else {
+    if (sb.style.display === 'none') {
+      sb.style.display = '';
+    } else {
+      sb.style.display = 'none';
+    }
+  }
+}
+
+/* ===================================================================
+   Keyboard shortcuts
+   =================================================================== */
+document.addEventListener('keydown', e => {
+  // Don't handle when in input/textarea
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+
+  if (e.key === '/') {
+    e.preventDefault();
+    document.getElementById('search-input').focus();
+  } else if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault();
+    openAddModal();
+  } else if (e.key === 'Escape') {
+    closeDetail();
+    closeAddModal();
+    closeAddFolderModal();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    e.preventDefault();
+    const filtered = getFilteredWatches();
+    if (selectedIds.size === filtered.length) {
+      selectedIds.clear();
+    } else {
+      filtered.forEach(w => selectedIds.add(w.id));
+    }
+    renderWatches();
+  } else if (e.key === 'Delete') {
+    if (selectedIds.size > 0) bulkAction('delete');
+  }
+});
+
+// Search input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('search-input').addEventListener('input', e => {
+    searchQuery = e.target.value;
+    renderWatches();
+  });
+});
+
+/* ===================================================================
+   WebSocket
+   =================================================================== */
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'watch_created' || data.type === 'watch_updated' || data.type === 'watch_deleted' || data.type === 'bulk_action') {
+      loadAll();
+    }
+  };
+  ws.onclose = () => setTimeout(connectWS, 3000);
+}
+
+/* ===================================================================
+   Helpers
+   =================================================================== */
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function truncUrl(url) {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    const path = u.pathname + u.search;
+    return u.hostname + (path.length > 40 ? path.substring(0, 37) + '...' : path);
+  } catch { return url.substring(0, 60); }
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return 'Never';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleString();
+}
+
+function formatInterval(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
+}
+
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); }, 3000);
+}
+
+/* ===================================================================
+   Init
+   =================================================================== */
+loadAll();
+connectWS();
+</script>
+</body>
+</html>

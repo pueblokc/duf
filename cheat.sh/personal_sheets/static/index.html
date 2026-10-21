@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>cheat.sh — Personal Sheets</title>
+<style>
+/* ─── Reset & Base ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0a0a;
+  --bg2:       #111111;
+  --bg3:       #1a1a1a;
+  --bg4:       #222222;
+  --border:    #1e3a1e;
+  --green:     #00ff41;
+  --green-dim: #00aa2a;
+  --green-dk:  #005511;
+  --cyan:      #00d4ff;
+  --yellow:    #ffd700;
+  --red:       #ff4444;
+  --text:      #c8ffc8;
+  --text-dim:  #6a8a6a;
+  --text-muted:#3a5a3a;
+  --mono:      'Courier New', 'Lucida Console', monospace;
+  --sidebar-w: 280px;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--green-dk); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--green-dim); }
+
+/* ─── Header ────────────────────────────────────────────────────────── */
+header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1rem;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.logo {
+  color: var(--green);
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+.logo span { color: var(--text-dim); }
+
+.header-search {
+  flex: 1;
+  max-width: 400px;
+  position: relative;
+}
+.header-search input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: .35rem .5rem .35rem 1.8rem;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color .2s;
+}
+.header-search input:focus { border-color: var(--green-dim); }
+.header-search .icon {
+  position: absolute;
+  left: .5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.header-actions { display: flex; gap: .5rem; margin-left: auto; }
+
+/* ─── Buttons ───────────────────────────────────────────────────────── */
+button {
+  font-family: var(--mono);
+  cursor: pointer;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  padding: .3rem .8rem;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--green-dk);
+  border-color: var(--green-dim);
+  color: var(--green);
+}
+.btn-primary:hover { background: #006618; border-color: var(--green); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+.btn-ghost:hover { border-color: var(--green-dim); color: var(--green); }
+
+.btn-danger {
+  background: transparent;
+  border-color: #4a1111;
+  color: #ff6666;
+}
+.btn-danger:hover { background: #2a0a0a; border-color: var(--red); }
+
+.btn-icon {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+  padding: .3rem .5rem;
+  font-size: 14px;
+}
+.btn-icon:hover { color: var(--green); }
+
+/* ─── Layout ────────────────────────────────────────────────────────── */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: .6rem .7rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.sidebar-header input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: .25rem .4rem;
+  border-radius: 3px;
+  outline: none;
+}
+.sidebar-header input:focus { border-color: var(--green-dim); }
+
+.ns-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ns-group { margin-bottom: 2px; }
+
+.ns-header {
+  display: flex;
+  align-items: center;
+  padding: .35rem .6rem;
+  cursor: pointer;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  user-select: none;
+  border-bottom: 1px solid var(--bg3);
+}
+.ns-header:hover { background: var(--bg3); }
+.ns-header .arrow { margin-right: .4rem; transition: transform .2s; display: inline-block; }
+.ns-header.collapsed .arrow { transform: rotate(-90deg); }
+.ns-header .ns-count {
+  margin-left: auto;
+  background: var(--bg4);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 0 .4rem;
+  font-size: 10px;
+}
+
+.sheet-list { padding-left: 0; }
+.sheet-item {
+  padding: .3rem .6rem .3rem 1.4rem;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  transition: all .1s;
+}
+.sheet-item:hover { color: var(--text); background: var(--bg3); }
+.sheet-item.active {
+  color: var(--green);
+  border-left-color: var(--green);
+  background: var(--bg3);
+}
+.sheet-item .dot { color: var(--text-muted); font-size: 10px; }
+
+.sidebar-footer {
+  padding: .5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: .4rem;
+}
+.sidebar-footer button { flex: 1; font-size: 11px; }
+
+/* ─── Main content ──────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ─── Empty state ───────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.empty-state .ascii {
+  color: var(--green-dk);
+  font-size: 12px;
+  white-space: pre;
+  line-height: 1.3;
+}
+.empty-state h2 { color: var(--text-dim); font-size: 1rem; }
+
+/* ─── Sheet view ────────────────────────────────────────────────────── */
+.sheet-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sheet-toolbar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .8rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sheet-title-row {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.sheet-ns {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.sheet-name {
+  font-size: 1rem;
+  color: var(--green);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-meta {
+  display: flex;
+  gap: .4rem;
+  padding: .4rem .8rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tag {
+  background: var(--bg4);
+  border: 1px solid var(--green-dk);
+  color: var(--green-dim);
+  border-radius: 2px;
+  padding: 0 .4rem;
+  font-size: 10px;
+  cursor: pointer;
+}
+.tag:hover { background: var(--green-dk); }
+
+.curl-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: .2rem .5rem;
+  font-size: 11px;
+  color: var(--cyan);
+  cursor: pointer;
+  transition: all .15s;
+}
+.curl-badge:hover { border-color: var(--cyan); background: #001a33; }
+.curl-badge code { color: var(--cyan); }
+
+/* ─── View toggle ───────────────────────────────────────────────────── */
+.view-toggle {
+  display: flex;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.view-toggle button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: .25rem .6rem;
+  font-size: 11px;
+}
+.view-toggle button.active {
+  background: var(--green-dk);
+  color: var(--green);
+}
+
+/* ─── Editor / Preview ──────────────────────────────────────────────── */
+.editor-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editor-pane, .preview-pane {
+  flex: 1;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.editor-pane {
+  border-right: 1px solid var(--border);
+}
+
+textarea {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 1rem;
+  border: none;
+  outline: none;
+  resize: none;
+  tab-size: 2;
+}
+
+.preview-pane {
+  padding: 1.2rem 1.4rem;
+  background: var(--bg);
+}
+
+/* ─── Markdown rendered ─────────────────────────────────────────────── */
+.preview-pane h1, .preview-pane h2, .preview-pane h3,
+.preview-pane h4, .preview-pane h5 {
+  color: var(--green);
+  margin: 1.2rem 0 .5rem;
+  padding-bottom: .3rem;
+  border-bottom: 1px solid var(--border);
+}
+.preview-pane h1 { font-size: 1.4rem; }
+.preview-pane h2 { font-size: 1.15rem; }
+.preview-pane h3 { font-size: 1rem; color: var(--green-dim); }
+.preview-pane p { margin: .6rem 0; line-height: 1.65; }
+.preview-pane ul, .preview-pane ol { margin: .4rem 0 .4rem 1.4rem; }
+.preview-pane li { margin: .2rem 0; line-height: 1.5; }
+.preview-pane code {
+  background: var(--bg3);
+  color: #7fff00;
+  padding: .1rem .3rem;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.preview-pane pre {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green-dk);
+  border-radius: 3px;
+  padding: .8rem 1rem;
+  overflow-x: auto;
+  margin: .6rem 0;
+}
+.preview-pane pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+.preview-pane table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: .6rem 0;
+  font-size: 12px;
+}
+.preview-pane th {
+  background: var(--bg3);
+  color: var(--green);
+  border: 1px solid var(--border);
+  padding: .3rem .6rem;
+  text-align: left;
+}
+.preview-pane td {
+  border: 1px solid var(--border);
+  padding: .3rem .6rem;
+}
+.preview-pane tr:nth-child(even) td { background: var(--bg2); }
+.preview-pane blockquote {
+  border-left: 3px solid var(--green-dk);
+  padding: .3rem .8rem;
+  color: var(--text-dim);
+  margin: .5rem 0;
+  background: var(--bg2);
+}
+.preview-pane hr { border-color: var(--border); margin: 1rem 0; }
+.preview-pane a { color: var(--cyan); }
+
+/* ─── Save bar ──────────────────────────────────────────────────────── */
+.save-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .8rem;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.save-bar .status { flex: 1; font-size: 11px; color: var(--text-muted); }
+.save-bar .status.saved { color: var(--green-dim); }
+.save-bar .status.error { color: var(--red); }
+
+/* ─── Modal ─────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1.5rem;
+  width: 480px;
+  max-width: 95vw;
+  box-shadow: 0 0 40px rgba(0,255,65,.08);
+}
+.modal h3 {
+  color: var(--green);
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: .5rem;
+}
+.form-row {
+  display: flex;
+  gap: .6rem;
+  margin-bottom: .6rem;
+  flex-wrap: wrap;
+}
+.form-field {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.form-field label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.form-field input, .form-field select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: .35rem .5rem;
+  border-radius: 3px;
+  outline: none;
+}
+.form-field input:focus, .form-field select:focus { border-color: var(--green-dim); }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  margin-top: 1rem;
+  padding-top: .8rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Toast ─────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: var(--bg3);
+  border: 1px solid var(--green-dk);
+  color: var(--green);
+  padding: .6rem 1rem;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 9999;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all .25s;
+  pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.error { border-color: #4a1111; color: var(--red); }
+
+/* ─── Search results dropdown ───────────────────────────────────────── */
+.search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  z-index: 500;
+  max-height: 300px;
+  overflow-y: auto;
+  display: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.search-results.open { display: block; }
+.search-result-item {
+  padding: .4rem .8rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--bg3);
+  transition: background .1s;
+}
+.search-result-item:hover { background: var(--bg3); }
+.search-result-item .r-name { color: var(--green); font-size: 12px; }
+.search-result-item .r-ns { color: var(--text-muted); font-size: 11px; }
+.search-result-item .r-desc { color: var(--text-dim); font-size: 11px; margin-top: 1px; }
+
+/* ─── Stats bar ─────────────────────────────────────────────────────── */
+.stats-bar {
+  padding: .3rem .8rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+.stats-bar span { color: var(--green-dim); }
+
+/* ─── Responsive ────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .sidebar { width: 220px; }
+  .editor-pane { display: none; }
+  .editor-pane.active { display: flex; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">cheat<span>.sh</span> <span style="color:var(--text-muted);font-size:.7rem;">personal</span></div>
+  <div class="header-search">
+    <span class="icon">⌕</span>
+    <input id="globalSearch" type="text" placeholder="search sheets..." autocomplete="off" />
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-primary" onclick="openNewModal()">+ New Sheet</button>
+  </div>
+</header>
+
+<!-- Body -->
+<div class="app-body">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <input id="sidebarFilter" type="text" placeholder="filter..." autocomplete="off" />
+      <button class="btn-icon" title="Collapse all" onclick="collapseAll()">⊟</button>
+    </div>
+    <div class="ns-list" id="nsList"></div>
+    <div class="sidebar-footer">
+      <button class="btn-ghost" onclick="openNewModal()">＋ New</button>
+      <button class="btn-ghost" onclick="showApiInfo()">⌨ API</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" id="mainArea">
+
+    <!-- Empty state (shown when no sheet selected) -->
+    <div class="empty-state" id="emptyState">
+      <div class="ascii">
+  ┌────────────────────────────────────┐
+  │  cheat.sh :: personal sheets mgr  │
+  │  ──────────────────────────────── │
+  │  $ curl localhost:8505/git/basics  │
+  │  # Git Quick Reference            │
+  │  ...                              │
+  └────────────────────────────────────┘</div>
+      <h2>Select a sheet or create a new one</h2>
+      <p>curl-compatible · markdown · searchable</p>
+      <button class="btn-primary" style="margin-top:.5rem" onclick="openNewModal()">+ Create First Sheet</button>
+    </div>
+
+    <!-- Sheet view (hidden until sheet selected) -->
+    <div class="sheet-view" id="sheetView" style="display:none">
+
+      <div class="sheet-toolbar">
+        <div class="sheet-title-row">
+          <div class="sheet-ns" id="viewNs"></div>
+          <div class="sheet-name" id="viewName"></div>
+        </div>
+        <div class="view-toggle" id="viewToggle">
+          <button class="active" onclick="setViewMode('split')" title="Split view">⊢⊣</button>
+          <button onclick="setViewMode('edit')" title="Edit only">✎</button>
+          <button onclick="setViewMode('preview')" title="Preview only">👁</button>
+        </div>
+        <button class="btn-ghost" onclick="openEditModal()">✎ Edit</button>
+        <button class="btn-danger" onclick="deleteCurrentSheet()">✕</button>
+      </div>
+
+      <div class="sheet-meta" id="sheetMeta">
+        <div id="tagList"></div>
+        <div class="curl-badge" id="curlBadge" onclick="copyCurl()" title="Click to copy curl command">
+          📋 <code id="curlCmd"></code>
+        </div>
+      </div>
+
+      <div class="editor-area">
+        <div class="editor-pane" id="editorPane">
+          <textarea id="editor" spellcheck="false" placeholder="# Your cheat sheet here...
+
+Use markdown for formatting:
+## Section
+```bash
+command --flag value
+```
+"></textarea>
+        </div>
+        <div class="preview-pane" id="previewPane"></div>
+      </div>
+
+      <div class="save-bar">
+        <div class="status" id="saveStatus">ready</div>
+        <button class="btn-ghost" onclick="saveCurrentSheet()">💾 Save</button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- New/Edit Modal -->
+<div class="modal-overlay" id="sheetModal">
+  <div class="modal">
+    <h3 id="modalTitle">New Cheat Sheet</h3>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Name</label>
+        <input id="fieldName" type="text" placeholder="my-commands" />
+      </div>
+      <div class="form-field">
+        <label>Namespace</label>
+        <input id="fieldNamespace" type="text" placeholder="git, docker, python..." list="nsSuggestions" />
+        <datalist id="nsSuggestions"></datalist>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field" style="flex:2">
+        <label>Description</label>
+        <input id="fieldDescription" type="text" placeholder="Short description..." />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field" style="flex:2">
+        <label>Tags (comma separated)</label>
+        <input id="fieldTags" type="text" placeholder="bash, tools, network" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitModal()">Create Sheet</button>
+    </div>
+  </div>
+</div>
+
+<!-- API Info Modal -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal" style="max-width:560px;width:560px;">
+    <h3>⌨ curl-compatible API</h3>
+    <div style="font-size:12px;line-height:1.8;color:var(--text-dim);">
+      <p style="color:var(--green-dim);margin-bottom:.5rem;">Fetch any sheet directly with curl:</p>
+      <pre style="background:var(--bg3);padding:.8rem;border-radius:3px;border-left:3px solid var(--green-dk);font-size:12px;overflow-x:auto;margin-bottom:1rem">curl localhost:8505/{namespace}/{name}   # plain text
+curl localhost:8505/{name}              # default namespace
+
+# REST API
+curl localhost:8505/api/sheets          # list all
+curl localhost:8505/api/search?q=git    # search
+curl localhost:8505/api/namespaces      # list namespaces
+curl localhost:8505/api/tags            # list tags
+
+# Create
+curl -X POST localhost:8505/api/sheets \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"my-sheet","namespace":"tools","content":"# My Sheet\n..."}'</pre>
+      <p style="color:var(--text-muted);font-size:11px;">Tip: Browsers get HTML preview, curl gets raw markdown.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeApiModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Marked.js for client-side markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<script>
+'use strict';
+
+// ─── State ────────────────────────────────────────────────────────────────
+let sheets = [];
+let currentSheet = null;
+let editingSheetId = null; // null = new sheet
+let saveTimer = null;
+let dirty = false;
+let viewMode = 'split'; // split | edit | preview
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAll();
+  setupEditor();
+  setupGlobalSearch();
+  setupSidebarFilter();
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleKeys);
+});
+
+async function loadAll() {
+  const [sheetData, nsData] = await Promise.all([
+    api('/api/sheets'),
+    api('/api/namespaces'),
+  ]);
+  sheets = sheetData;
+  renderSidebar(sheets);
+  populateNsSuggestions(nsData);
+  updateStats();
+}
+
+// ─── API helper ───────────────────────────────────────────────────────────
+async function api(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 204) return null;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'API error');
+    return data;
+  } catch (e) {
+    toast(e.message, true);
+    throw e;
+  }
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────
+function renderSidebar(sheetList, filter = '') {
+  const el = document.getElementById('nsList');
+  const lf = filter.toLowerCase();
+
+  // Group by namespace
+  const groups = {};
+  sheetList.forEach(s => {
+    if (lf && !s.name.toLowerCase().includes(lf) && !s.namespace.toLowerCase().includes(lf)) return;
+    if (!groups[s.namespace]) groups[s.namespace] = [];
+    groups[s.namespace].push(s);
+  });
+
+  if (Object.keys(groups).length === 0) {
+    el.innerHTML = '<div style="padding:.8rem;color:var(--text-muted);font-size:11px;text-align:center">no sheets found</div>';
+    return;
+  }
+
+  el.innerHTML = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0])).map(([ns, items]) => `
+    <div class="ns-group">
+      <div class="ns-header" onclick="toggleNs(this)">
+        <span class="arrow">▾</span>${ns}
+        <span class="ns-count">${items.length}</span>
+      </div>
+      <div class="sheet-list">
+        ${items.sort((a,b)=>a.name.localeCompare(b.name)).map(s => `
+          <div class="sheet-item ${currentSheet?.id === s.id ? 'active' : ''}"
+               data-id="${s.id}"
+               onclick="selectSheet(${s.id})">
+            <span class="dot">›</span>${s.name}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleNs(header) {
+  header.classList.toggle('collapsed');
+  const list = header.nextElementSibling;
+  list.style.display = header.classList.contains('collapsed') ? 'none' : '';
+}
+
+function collapseAll() {
+  document.querySelectorAll('.ns-header').forEach(h => {
+    h.classList.add('collapsed');
+    h.nextElementSibling.style.display = 'none';
+  });
+}
+
+function setupSidebarFilter() {
+  const input = document.getElementById('sidebarFilter');
+  input.addEventListener('input', () => renderSidebar(sheets, input.value));
+}
+
+// ─── Select sheet ─────────────────────────────────────────────────────────
+async function selectSheet(id) {
+  if (dirty && currentSheet) {
+    if (confirm('You have unsaved changes. Save before switching?')) {
+      await saveCurrentSheet();
+    }
+  }
+  const sheet = sheets.find(s => s.id === id);
+  if (!sheet) return;
+
+  currentSheet = sheet;
+  dirty = false;
+  editingSheetId = null;
+
+  // Update UI
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('sheetView').style.display = 'flex';
+
+  document.getElementById('viewNs').textContent = sheet.namespace;
+  document.getElementById('viewName').textContent = sheet.name;
+  document.getElementById('editor').value = sheet.content;
+
+  // Tags
+  const tags = sheet.tags || [];
+  document.getElementById('tagList').innerHTML = tags.map(t =>
+    `<span class="tag" onclick="filterByTag('${t}')">#${t}</span>`
+  ).join(' ');
+
+  // curl command
+  const curlStr = `curl localhost:8505/${sheet.namespace}/${sheet.name}`;
+  document.getElementById('curlCmd').textContent = curlStr;
+
+  // Description in meta
+  if (sheet.description) {
+    const desc = document.createElement('span');
+    desc.style.cssText = 'color:var(--text-dim);font-size:11px;margin-right:.5rem';
+    desc.textContent = sheet.description;
+    document.getElementById('sheetMeta').prepend(desc);
+  }
+
+  renderPreview();
+  updateSidebarActive(id);
+  setSaveStatus('ready');
+}
+
+function updateSidebarActive(id) {
+  document.querySelectorAll('.sheet-item').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.id) === id);
+  });
+}
+
+// ─── Editor ───────────────────────────────────────────────────────────────
+function setupEditor() {
+  const editor = document.getElementById('editor');
+
+  editor.addEventListener('input', () => {
+    dirty = true;
+    setSaveStatus('unsaved');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(autoSave, 2000);
+    renderPreview();
+  });
+
+  // Tab key inserts spaces
+  editor.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.slice(0, start) + '  ' + editor.value.slice(end);
+      editor.selectionStart = editor.selectionEnd = start + 2;
+    }
+  });
+}
+
+function renderPreview() {
+  const content = document.getElementById('editor').value;
+  const preview = document.getElementById('previewPane');
+  if (window.marked) {
+    marked.setOptions({ breaks: true, gfm: true });
+    preview.innerHTML = marked.parse(content);
+  } else {
+    // Fallback: very basic
+    preview.innerHTML = '<pre>' + escHtml(content) + '</pre>';
+  }
+  // Syntax highlight code blocks (basic terminal style)
+  preview.querySelectorAll('pre code').forEach(block => {
+    block.style.color = 'var(--text)';
+  });
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── View modes ───────────────────────────────────────────────────────────
+function setViewMode(mode) {
+  viewMode = mode;
+  const editorPane = document.getElementById('editorPane');
+  const previewPane = document.getElementById('previewPane');
+  const btns = document.querySelectorAll('#viewToggle button');
+  const modeMap = ['split','edit','preview'];
+  btns.forEach((b,i) => b.classList.toggle('active', modeMap[i] === mode));
+
+  if (mode === 'split') {
+    editorPane.style.display = '';
+    previewPane.style.display = '';
+  } else if (mode === 'edit') {
+    editorPane.style.display = '';
+    previewPane.style.display = 'none';
+  } else {
+    editorPane.style.display = 'none';
+    previewPane.style.display = '';
+  }
+}
+
+// ─── Save ─────────────────────────────────────────────────────────────────
+async function autoSave() {
+  if (currentSheet && dirty) await saveCurrentSheet(true);
+}
+
+async function saveCurrentSheet(silent = false) {
+  if (!currentSheet) return;
+  try {
+    setSaveStatus('saving...');
+    const updated = await api(`/api/sheets/${currentSheet.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: document.getElementById('editor').value }),
+    });
+    currentSheet = updated;
+    // update local cache
+    const idx = sheets.findIndex(s => s.id === updated.id);
+    if (idx >= 0) sheets[idx] = updated;
+    dirty = false;
+    setSaveStatus('saved ✓', 'saved');
+    if (!silent) toast('Saved!');
+  } catch (e) {
+    setSaveStatus('save failed', 'error');
+  }
+}
+
+function setSaveStatus(msg, cls = '') {
+  const el = document.getElementById('saveStatus');
+  el.textContent = msg;
+  el.className = 'status ' + cls;
+}
+
+// ─── Delete ───────────────────────────────────────────────────────────────
+async function deleteCurrentSheet() {
+  if (!currentSheet) return;
+  if (!confirm(`Delete "${currentSheet.namespace}/${currentSheet.name}"? This cannot be undone.`)) return;
+  await api(`/api/sheets/${currentSheet.id}`, { method: 'DELETE' });
+  toast('Sheet deleted');
+  sheets = sheets.filter(s => s.id !== currentSheet.id);
+  currentSheet = null;
+  dirty = false;
+  document.getElementById('sheetView').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'flex';
+  renderSidebar(sheets);
+  updateStats();
+}
+
+// ─── New / Edit modal ─────────────────────────────────────────────────────
+function openNewModal() {
+  editingSheetId = null;
+  document.getElementById('modalTitle').textContent = 'New Cheat Sheet';
+  document.getElementById('fieldName').value = '';
+  document.getElementById('fieldNamespace').value = '';
+  document.getElementById('fieldDescription').value = '';
+  document.getElementById('fieldTags').value = '';
+  document.querySelector('#sheetModal .btn-primary').textContent = 'Create Sheet';
+  document.getElementById('sheetModal').classList.add('open');
+  setTimeout(() => document.getElementById('fieldName').focus(), 50);
+}
+
+function openEditModal() {
+  if (!currentSheet) return;
+  editingSheetId = currentSheet.id;
+  document.getElementById('modalTitle').textContent = 'Edit Sheet Info';
+  document.getElementById('fieldName').value = currentSheet.name;
+  document.getElementById('fieldNamespace').value = currentSheet.namespace;
+  document.getElementById('fieldDescription').value = currentSheet.description;
+  document.getElementById('fieldTags').value = (currentSheet.tags || []).join(', ');
+  document.querySelector('#sheetModal .btn-primary').textContent = 'Update Sheet';
+  document.getElementById('sheetModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('sheetModal').classList.remove('open');
+}
+
+async function submitModal() {
+  const name = document.getElementById('fieldName').value.trim();
+  const namespace = document.getElementById('fieldNamespace').value.trim() || 'default';
+  const description = document.getElementById('fieldDescription').value.trim();
+  const tags = document.getElementById('fieldTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+
+  if (!name) { toast('Name is required', true); return; }
+
+  try {
+    let sheet;
+    if (editingSheetId) {
+      sheet = await api(`/api/sheets/${editingSheetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, namespace, description, tags }),
+      });
+      const idx = sheets.findIndex(s => s.id === sheet.id);
+      if (idx >= 0) sheets[idx] = sheet;
+      toast('Sheet updated!');
+    } else {
+      sheet = await api('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, namespace, description, tags, content: '' }),
+      });
+      sheets.push(sheet);
+      toast('Sheet created!');
+    }
+    closeModal();
+    renderSidebar(sheets);
+    updateStats();
+    selectSheet(sheet.id);
+    if (!editingSheetId) {
+      // Focus editor for new sheets
+      setTimeout(() => document.getElementById('editor').focus(), 100);
+    }
+  } catch (e) { /* handled by api() */ }
+}
+
+// ─── Global search ────────────────────────────────────────────────────────
+function setupGlobalSearch() {
+  const input = document.getElementById('globalSearch');
+  const results = document.getElementById('searchResults');
+  let searchTimer;
+
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = input.value.trim();
+    if (!q) { results.classList.remove('open'); return; }
+    searchTimer = setTimeout(() => doSearch(q), 200);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { results.classList.remove('open'); input.value = ''; }
+    if (e.key === 'ArrowDown') {
+      const first = results.querySelector('.search-result-item');
+      if (first) first.focus();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.header-search')) results.classList.remove('open');
+  });
+}
+
+async function doSearch(q) {
+  const results = document.getElementById('searchResults');
+  try {
+    const data = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!data.length) {
+      results.innerHTML = '<div style="padding:.5rem .8rem;color:var(--text-muted);font-size:12px">No results</div>';
+    } else {
+      results.innerHTML = data.slice(0, 10).map(s => `
+        <div class="search-result-item" onclick="selectSheet(${s.id});closeSearch()" tabindex="0">
+          <div class="r-ns">${s.namespace}/</div>
+          <div class="r-name">${s.name}</div>
+          ${s.description ? `<div class="r-desc">${s.description}</div>` : ''}
+        </div>
+      `).join('');
+    }
+    results.classList.add('open');
+  } catch (e) {
+    results.classList.remove('open');
+  }
+}
+
+function closeSearch() {
+  document.getElementById('searchResults').classList.remove('open');
+  document.getElementById('globalSearch').value = '';
+}
+
+// ─── Tag filter ───────────────────────────────────────────────────────────
+function filterByTag(tag) {
+  const filtered = sheets.filter(s => (s.tags || []).includes(tag));
+  renderSidebar(filtered);
+  document.getElementById('sidebarFilter').value = `#${tag}`;
+  toast(`Filtered by #${tag}`);
+}
+
+// ─── Curl copy ────────────────────────────────────────────────────────────
+async function copyCurl() {
+  if (!currentSheet) return;
+  const cmd = `curl localhost:8505/${currentSheet.namespace}/${currentSheet.name}`;
+  try {
+    await navigator.clipboard.writeText(cmd);
+    toast('curl command copied!');
+  } catch (e) {
+    toast('Copy failed — select and copy manually', true);
+  }
+}
+
+// ─── API info modal ───────────────────────────────────────────────────────
+function showApiInfo() {
+  document.getElementById('apiModal').classList.add('open');
+}
+function closeApiModal() {
+  document.getElementById('apiModal').classList.remove('open');
+}
+
+// ─── Stats bar ────────────────────────────────────────────────────────────
+function updateStats() {
+  const namespaces = [...new Set(sheets.map(s => s.namespace))].length;
+  // Add or update stats bar
+  let bar = document.getElementById('statsBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'statsBar';
+    bar.className = 'stats-bar';
+    document.querySelector('.sidebar').insertBefore(bar, document.querySelector('.ns-list'));
+  }
+  bar.innerHTML = `<span>${sheets.length}</span> sheets &nbsp; <span>${namespaces}</span> namespaces`;
+}
+
+// ─── Namespace suggestions ────────────────────────────────────────────────
+function populateNsSuggestions(nsData) {
+  const dl = document.getElementById('nsSuggestions');
+  dl.innerHTML = nsData.map(n => `<option value="${n.namespace}">`).join('');
+}
+
+// ─── Keyboard shortcuts ───────────────────────────────────────────────────
+function handleKeys(e) {
+  // Ctrl+S / Cmd+S → save
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveCurrentSheet();
+  }
+  // Ctrl+K → focus search
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('globalSearch').focus();
+  }
+  // Escape → close modals
+  if (e.key === 'Escape') {
+    closeModal();
+    closeApiModal();
+  }
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ─── Modal enter key ─────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('sheetModal').classList.contains('open')) {
+    submitModal();
+  }
+});
+</script>
+<footer style="text-align:center;padding:16px 0;margin-top:32px;border-top:1px solid #1e3a1e;color:#3a5a3a;font-size:13px;font-family:var(--mono);">
+  Developed by <a href="https://kccsonline.com" target="_blank" style="color:#6a8a6a;text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:#3a5a3a;text-decoration:none;">kccsonline.com</a>
+</footer>
+</body>
+</html>

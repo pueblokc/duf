@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>beets web — music library</title>
+  <style>
+    /* ================================================================
+       RESET & BASE
+    ================================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --bg2:       #161b27;
+      --bg3:       #1e2538;
+      --border:    #2a3147;
+      --accent:    #1db954;
+      --accent2:   #1ed760;
+      --text:      #e8eaf0;
+      --text2:     #8892a4;
+      --text3:     #4a5568;
+      --red:       #e05252;
+      --yellow:    #f5c842;
+      --blue:      #4a90e2;
+      --purple:    #9b59b6;
+
+      --sidebar-w: 240px;
+      --player-h:  80px;
+      --header-h:  64px;
+      --radius:    8px;
+      --radius-lg: 14px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; border: none; background: none; font: inherit; }
+    input, select, textarea { font: inherit; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+    /* ================================================================
+       LAYOUT SHELL
+    ================================================================ */
+    #app {
+      display: grid;
+      grid-template-rows: var(--header-h) 1fr var(--player-h);
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-areas:
+        "header  header"
+        "sidebar main"
+        "player  player";
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ================================================================
+       HEADER
+    ================================================================ */
+    #header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .logo svg { width: 28px; height: 28px; }
+
+    .logo span.dim { color: var(--text2); font-weight: 400; font-size: 14px; }
+
+    .search-wrap {
+      flex: 1;
+      max-width: 520px;
+      position: relative;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text3);
+      width: 16px; height: 16px;
+    }
+
+    #search-input {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 16px 8px 38px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    #search-input:focus { border-color: var(--accent); }
+    #search-input::placeholder { color: var(--text3); }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .view-btn {
+      padding: 6px 10px;
+      border-radius: var(--radius);
+      color: var(--text2);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .view-btn.active, .view-btn:hover {
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .view-btn svg { width: 18px; height: 18px; display: block; }
+
+    .sort-select {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 6px 10px;
+      outline: none;
+    }
+
+    /* ================================================================
+       SIDEBAR
+    ================================================================ */
+    #sidebar {
+      grid-area: sidebar;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px 0;
+    }
+
+    .sidebar-section { margin-bottom: 24px; }
+
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text3);
+      padding: 0 16px 8px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background 0.1s;
+      color: var(--text2);
+      gap: 8px;
+    }
+
+    .sidebar-item:hover { background: var(--bg3); color: var(--text); }
+
+    .sidebar-item.active {
+      background: var(--bg3);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .sidebar-item .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .sidebar-item .badge {
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--bg);
+      padding: 1px 7px;
+      border-radius: 999px;
+    }
+
+    /* ================================================================
+       STATS BAR
+    ================================================================ */
+    #stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .stat-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .stat-icon svg { width: 20px; height: 20px; }
+
+    .stat-icon.green  { background: rgba(29,185,84,0.15); color: var(--accent); }
+    .stat-icon.blue   { background: rgba(74,144,226,0.15); color: var(--blue); }
+    .stat-icon.purple { background: rgba(155,89,182,0.15); color: var(--purple); }
+    .stat-icon.yellow { background: rgba(245,200,66,0.15); color: var(--yellow); }
+
+    .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-lbl {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 3px;
+    }
+
+    /* ================================================================
+       MAIN CONTENT AREA
+    ================================================================ */
+    #main {
+      grid-area: main;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 24px 24px;
+    }
+
+    /* ================================================================
+       SECTION HEADER (results count + sort)
+    ================================================================ */
+    .section-header {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+      padding: 16px 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .results-count {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 2px;
+    }
+
+    /* ================================================================
+       ALBUM GRID
+    ================================================================ */
+    #album-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 20px;
+    }
+
+    .album-card {
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+      position: relative;
+    }
+
+    .album-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+      border-color: var(--accent);
+    }
+
+    .album-art {
+      width: 100%;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .album-art-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .album-art-text {
+      font-size: 36px;
+      font-weight: 900;
+      opacity: 0.9;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .album-art-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .album-play-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.18s, transform 0.18s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .album-play-btn svg { width: 18px; height: 18px; margin-left: 2px; }
+
+    .album-card:hover .album-play-btn {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .album-info {
+      padding: 12px 14px 14px;
+    }
+
+    .album-title {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .album-artist {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .album-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-format-flac { background: rgba(29,185,84,0.18); color: var(--accent); }
+    .badge-format-mp3  { background: rgba(74,144,226,0.18); color: var(--blue); }
+    .badge-year        { background: var(--bg3); color: var(--text3); }
+
+    /* ================================================================
+       ALBUM DETAIL PANEL
+    ================================================================ */
+    #album-detail {
+      display: none;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    #album-detail.visible { display: flex; }
+
+    .detail-header {
+      display: flex;
+      gap: 28px;
+      padding: 24px 0 24px;
+      align-items: flex-end;
+    }
+
+    .detail-art {
+      width: 200px;
+      height: 200px;
+      border-radius: var(--radius-lg);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      font-weight: 900;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .detail-art-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .detail-info { flex: 1; min-width: 0; }
+    .detail-type { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+
+    .detail-title {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 6px 0 10px;
+      letter-spacing: -0.5px;
+    }
+
+    .detail-artist {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .detail-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .detail-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .detail-badge + .detail-badge::before {
+      content: '·';
+      margin-right: 4px;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      align-items: center;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      background: var(--accent);
+      color: #000;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 13px;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-primary:hover { background: var(--accent2); transform: scale(1.02); }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text2);
+      font-size: 13px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+    .btn-icon {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-icon:hover { border-color: var(--text); color: var(--text); }
+    .btn-icon svg { width: 16px; height: 16px; }
+
+    /* ================================================================
+       TRACKLIST
+    ================================================================ */
+    .tracklist {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .tracklist-header {
+      display: grid;
+      grid-template-columns: 36px 1fr 120px 60px;
+      gap: 12px;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .track-row {
+      display: grid;
+      grid-template-columns: 36px 1fr 120px 60px;
+      gap: 12px;
+      padding: 10px 16px;
+      align-items: center;
+      border-radius: 0;
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+
+    .track-row:hover { background: var(--bg3); }
+
+    .track-row:hover .track-num { display: none; }
+    .track-row:hover .track-play-icon { display: flex; }
+
+    .track-num {
+      color: var(--text3);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .track-play-icon {
+      display: none;
+      color: var(--accent);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .track-play-icon svg { width: 16px; height: 16px; }
+
+    .track-title { font-size: 13px; font-weight: 500; }
+
+    .track-format {
+      font-size: 11px;
+      color: var(--text2);
+    }
+
+    .track-dur {
+      font-size: 12px;
+      color: var(--text3);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    /* ================================================================
+       BACK BUTTON
+    ================================================================ */
+    #back-btn {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      color: var(--text2);
+      font-size: 13px;
+      padding: 6px 0;
+      transition: color 0.15s;
+      margin-bottom: 4px;
+    }
+
+    #back-btn.visible { display: flex; }
+    #back-btn:hover { color: var(--text); }
+    #back-btn svg { width: 16px; height: 16px; }
+
+    /* ================================================================
+       EDIT MODAL
+    ================================================================ */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    #modal-overlay.visible { display: flex; }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      width: 480px;
+      max-width: 95vw;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .form-row {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-input:focus { border-color: var(--accent); }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    /* ================================================================
+       BOTTOM PLAYER
+    ================================================================ */
+    #player {
+      grid-area: player;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      z-index: 100;
+    }
+
+    .player-now-playing {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 240px;
+      flex-shrink: 0;
+    }
+
+    .player-thumb {
+      width: 48px; height: 48px;
+      border-radius: var(--radius);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .player-track-info { min-width: 0; }
+
+    .player-track-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-artist-name {
+      font-size: 11px;
+      color: var(--text2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-controls {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .player-btns {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .ctrl-btn {
+      color: var(--text2);
+      transition: color 0.15s;
+    }
+
+    .ctrl-btn:hover { color: var(--text); }
+    .ctrl-btn svg { width: 20px; height: 20px; display: block; }
+
+    .ctrl-btn.play {
+      width: 38px; height: 38px;
+      background: var(--text);
+      color: var(--bg);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s;
+    }
+
+    .ctrl-btn.play:hover { transform: scale(1.08); }
+    .ctrl-btn.play svg { width: 16px; height: 16px; }
+
+    .progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .prog-time {
+      font-size: 11px;
+      color: var(--text3);
+      font-variant-numeric: tabular-nums;
+      width: 32px;
+      flex-shrink: 0;
+    }
+
+    .prog-time.right { text-align: right; }
+
+    .progress-track {
+      flex: 1;
+      height: 4px;
+      background: var(--bg3);
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s linear;
+    }
+
+    .player-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 180px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+
+    .vol-icon svg { width: 18px; height: 18px; display: block; color: var(--text2); }
+
+    .vol-slider {
+      width: 80px;
+      height: 4px;
+      background: var(--bg3);
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    /* ================================================================
+       TOAST
+    ================================================================ */
+    #toast {
+      position: fixed;
+      bottom: 100px;
+      right: 24px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 9999;
+      max-width: 320px;
+    }
+
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { border-color: var(--accent); color: var(--accent); }
+    #toast.error { border-color: var(--red); color: var(--red); }
+
+    /* ================================================================
+       LOADING
+    ================================================================ */
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 80px;
+    }
+
+    /* ================================================================
+       EMPTY STATE
+    ================================================================ */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 80px;
+      color: var(--text3);
+    }
+
+    .empty-state svg { width: 48px; height: 48px; opacity: 0.4; }
+    .empty-state p { font-size: 15px; }
+
+    /* ================================================================
+       FORMAT BADGE COLORS
+    ================================================================ */
+    .badge-genre {
+      background: var(--bg3);
+      color: var(--text2);
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============================================================
+       HEADER
+  ============================================================ -->
+  <header id="header">
+    <div class="logo">
+      <!-- beets leaf SVG -->
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="14" fill="#1db954" opacity="0.2"/>
+        <path d="M14 6C14 6 8 10 8 15C8 18.314 10.686 21 14 21C17.314 21 20 18.314 20 15C20 10 14 6 14 6Z" fill="#1db954"/>
+        <path d="M14 10V21" stroke="#0f1117" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M14 13L11 10.5" stroke="#0f1117" stroke-width="1.2" stroke-linecap="round"/>
+        <path d="M14 16L17 13.5" stroke="#0f1117" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      beets
+      <span class="dim">web</span>
+    </div>
+
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input id="search-input" type="text" placeholder="Search albums, artists, genres…" autocomplete="off" />
+    </div>
+
+    <div class="header-actions">
+      <select class="sort-select" id="sort-select">
+        <option value="year_desc">Newest first</option>
+        <option value="year_asc">Oldest first</option>
+        <option value="title">Title A–Z</option>
+        <option value="artist">Artist A–Z</option>
+      </select>
+
+      <button class="view-btn active" id="view-grid" title="Grid view">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       SIDEBAR
+  ============================================================ -->
+  <nav id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Library</div>
+      <div class="sidebar-item active" data-filter="all" onclick="setFilter('all')">
+        <span>All Albums</span>
+        <span class="badge" id="badge-all">—</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Genres</div>
+      <div id="genre-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Format</div>
+      <div id="format-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Artists</div>
+      <div id="artist-list"></div>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       MAIN
+  ============================================================ -->
+  <main id="main">
+    <!-- Stats bar -->
+    <div id="stats-bar">
+      <div class="stat-card">
+        <div class="stat-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-val" id="stat-albums">—</div>
+          <div class="stat-lbl">Albums</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-val" id="stat-tracks">—</div>
+          <div class="stat-lbl">Tracks</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-val" id="stat-artists">—</div>
+          <div class="stat-lbl">Artists</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon yellow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-val" id="stat-duration">—</div>
+          <div class="stat-lbl">Total playtime</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content area -->
+    <div id="content">
+      <!-- Back button (shown in album detail) -->
+      <button id="back-btn" onclick="showGrid()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Back to library
+      </button>
+
+      <!-- Grid section -->
+      <div id="grid-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title" id="section-title">Library</div>
+            <div class="results-count" id="results-count"></div>
+          </div>
+        </div>
+        <div id="album-grid">
+          <div class="loading-wrap"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Album detail section -->
+      <div id="album-detail"></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       PLAYER
+  ============================================================ -->
+  <div id="player">
+    <div class="player-now-playing">
+      <div class="player-thumb" id="player-thumb" style="background: #1e2538; color: #4a5568;">
+        ♪
+      </div>
+      <div class="player-track-info">
+        <div class="player-track-name" id="player-track-name">Nothing playing</div>
+        <div class="player-artist-name" id="player-artist-name">Select a track to play</div>
+      </div>
+    </div>
+
+    <div class="player-controls">
+      <div class="player-btns">
+        <button class="ctrl-btn" title="Shuffle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+            <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" title="Previous">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn play" title="Play/Pause" onclick="togglePlay()">
+          <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" title="Next">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" title="Repeat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+        </button>
+      </div>
+      <div class="progress-wrap">
+        <span class="prog-time" id="prog-current">0:00</span>
+        <div class="progress-track" onclick="seekTo(event)">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <span class="prog-time right" id="prog-total">0:00</span>
+      </div>
+    </div>
+
+    <div class="player-right">
+      <div class="vol-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      </div>
+      <div class="vol-slider">
+        <div style="width:70%;height:100%;background:var(--text2);border-radius:2px;"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     EDIT MODAL
+============================================================ -->
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">Edit Album</div>
+    <div class="form-row">
+      <label class="form-label">Title</label>
+      <input class="form-input" id="edit-title" type="text" />
+    </div>
+    <div class="form-row">
+      <label class="form-label">Artist</label>
+      <input class="form-input" id="edit-artist" type="text" />
+    </div>
+    <div class="form-row">
+      <label class="form-label">Year</label>
+      <input class="form-input" id="edit-year" type="number" min="1900" max="2099" />
+    </div>
+    <div class="form-row">
+      <label class="form-label">Genre</label>
+      <input class="form-input" id="edit-genre" type="text" />
+    </div>
+    <div class="form-row">
+      <label class="form-label">Label</label>
+      <input class="form-input" id="edit-label" type="text" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ================================================================
+   STATE
+================================================================ */
+const state = {
+  albums: [],
+  total: 0,
+  currentAlbum: null,
+  filter: { type: 'all', value: null },
+  sort: 'year_desc',
+  search: '',
+  playing: false,
+  editAlbumId: null,
+};
+
+/* ================================================================
+   GENRE COLOR MAP
+================================================================ */
+const GENRE_COLORS = {
+  'Rock':         ['#c0392b', '#922b21'],
+  'Grunge':       ['#7d6608', '#6e2f0a'],
+  'Art Rock':     ['#1a5276', '#154360'],
+  'Hard Rock':    ['#6e2f0a', '#512e5f'],
+  'Heavy Metal':  ['#212f3c', '#1a252f'],
+  'Thrash Metal': ['#1b2631', '#2e4053'],
+  'Electronic':   ['#1a5276', '#0d47a1'],
+  'House':        ['#1abc9c', '#148f77'],
+  'Ambient':      ['#2e4057', '#1a2a3a'],
+  'IDM':          ['#1f618d', '#154360'],
+  'UK Garage':    ['#1e3a5f', '#17202a'],
+  'Hip-Hop':      ['#7d3c98', '#512e5f'],
+  'Jazz':         ['#b7950b', '#9a7d0a'],
+  'Jazz Fusion':  ['#6e2f0a', '#4a235a'],
+  'Classical':    ['#1a5276', '#0b3d6f'],
+  'Soul':         ['#7e5109', '#6e2f0a'],
+  'R&B':          ['#922b21', '#7d1a1a'],
+  'Indie Rock':   ['#117a65', '#0e6655'],
+  'Indie Folk':   ['#1e8449', '#196f3d'],
+  'Shoegaze':     ['#6c3483', '#5b2c6f'],
+  'Alt-Country':  ['#784212', '#6e2f0a'],
+  'Folk':         ['#196f3d', '#145a32'],
+  'Country':      ['#935116', '#784212'],
+  'Country Rock': ['#7e5109', '#6e2f0a'],
+  'Reggae':       ['#1d8348', '#196f3d'],
+  'World':        ['#b7950b', '#9a7d0a'],
+  'Pop':          ['#a93226', '#8b0000'],
+  'Punk':         ['#1f618d', '#0d3b6e'],
+  'default':      ['#2c3e50', '#1a252f'],
+};
+
+function genreGradient(genre) {
+  const [c1, c2] = GENRE_COLORS[genre] || GENRE_COLORS['default'];
+  return `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
+}
+
+function albumInitials(title) {
+  return title.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+function fmtDur(secs) {
+  if (!secs) return '0:00';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtNum(n) {
+  return n.toLocaleString();
+}
+
+/* ================================================================
+   API CALLS
+================================================================ */
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+/* ================================================================
+   INIT
+================================================================ */
+async function init() {
+  await Promise.all([loadStats(), loadSidebar(), loadAlbums()]);
+}
+
+async function loadStats() {
+  const stats = await api('/api/stats');
+  document.getElementById('stat-albums').textContent   = fmtNum(stats.total_albums);
+  document.getElementById('stat-tracks').textContent   = fmtNum(stats.total_tracks);
+  document.getElementById('stat-artists').textContent  = fmtNum(stats.total_artists);
+  document.getElementById('stat-duration').textContent = stats.total_duration_fmt;
+  document.getElementById('badge-all').textContent     = stats.total_albums;
+}
+
+async function loadSidebar() {
+  const [genres, artists, formats] = await Promise.all([
+    api('/api/genres'),
+    api('/api/artists'),
+    api('/api/formats'),
+  ]);
+
+  // Genres
+  const gl = document.getElementById('genre-list');
+  gl.innerHTML = genres.map(g => `
+    <div class="sidebar-item" data-filter="genre:${g.genre}" onclick="setFilter('genre','${escAttr(g.genre)}')">
+      <span>${g.genre}</span>
+      <span class="badge">${g.count}</span>
+    </div>`).join('');
+
+  // Formats
+  const fl = document.getElementById('format-list');
+  fl.innerHTML = formats.map(f => `
+    <div class="sidebar-item" data-filter="format:${f.format}" onclick="setFilter('format','${escAttr(f.format)}')">
+      <span>${f.format}</span>
+      <span class="badge">${f.count}</span>
+    </div>`).join('');
+
+  // Artists (top 15)
+  const al = document.getElementById('artist-list');
+  al.innerHTML = artists.slice(0, 15).map(a => `
+    <div class="sidebar-item" data-filter="artist:${a.name}" onclick="setFilter('artist','${escAttr(a.name)}')">
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${a.name}</span>
+      <span class="badge">${a.album_count}</span>
+    </div>`).join('');
+}
+
+function escAttr(s) {
+  return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+async function loadAlbums() {
+  const grid = document.getElementById('album-grid');
+  grid.innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
+
+  const params = new URLSearchParams({ sort: state.sort, limit: 200 });
+  if (state.search)              params.set('q', state.search);
+  if (state.filter.type === 'genre')   params.set('genre', state.filter.value);
+  if (state.filter.type === 'artist')  params.set('artist', state.filter.value);
+  if (state.filter.type === 'format')  params.set('format', state.filter.value);
+
+  const data = await api('/api/albums?' + params);
+  state.albums = data.items;
+  state.total  = data.total;
+
+  renderGrid();
+}
+
+/* ================================================================
+   RENDER GRID
+================================================================ */
+function renderGrid() {
+  const grid = document.getElementById('album-grid');
+
+  document.getElementById('results-count').textContent =
+    `${state.total} album${state.total !== 1 ? 's' : ''}`;
+
+  if (state.albums.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
+      <p>No albums found</p>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = state.albums.map(a => `
+    <div class="album-card" onclick="openAlbum(${a.id})">
+      <div class="album-art" style="background:${genreGradient(a.genre)}">
+        <div class="album-art-inner">
+          <div class="album-art-text">${albumInitials(a.title)}</div>
+        </div>
+        <div class="album-art-overlay"></div>
+        <button class="album-play-btn" onclick="playAlbum(event,${a.id})">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+      </div>
+      <div class="album-info">
+        <div class="album-title" title="${esc(a.title)}">${esc(a.title)}</div>
+        <div class="album-artist" title="${esc(a.artist)}">${esc(a.artist)}</div>
+        <div class="album-meta">
+          <span class="badge badge-year">${a.year || '?'}</span>
+          <span class="badge badge-format-${(a.format||'').toLowerCase()}">${a.format || '?'}</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/* ================================================================
+   ALBUM DETAIL
+================================================================ */
+async function openAlbum(id) {
+  const album = await api(`/api/albums/${id}`);
+  state.currentAlbum = album;
+
+  // Switch views
+  document.getElementById('grid-section').style.display = 'none';
+  document.getElementById('album-detail').classList.add('visible');
+  document.getElementById('back-btn').classList.add('visible');
+
+  renderAlbumDetail(album);
+  window.scrollTo(0, 0);
+}
+
+function renderAlbumDetail(album) {
+  const detail = document.getElementById('album-detail');
+  const grad = genreGradient(album.genre);
+  const initials = albumInitials(album.title);
+  const totalDur = album.tracks.reduce((s, t) => s + (t.duration || 0), 0);
+
+  detail.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-art" style="background:${grad}">
+        <span style="font-size:64px;font-weight:900;opacity:0.9;text-shadow:0 2px 12px rgba(0,0,0,0.5);z-index:1">${initials}</span>
+        <div class="detail-art-overlay"></div>
+      </div>
+      <div class="detail-info">
+        <div class="detail-type">Album</div>
+        <div class="detail-title">${esc(album.title)}</div>
+        <div class="detail-artist">${esc(album.artist)}</div>
+        <div class="detail-badges">
+          <span class="detail-badge">${album.year || '?'}</span>
+          <span class="detail-badge">${esc(album.genre || '—')}</span>
+          <span class="detail-badge">${album.track_count} tracks</span>
+          <span class="detail-badge">${fmtDur(totalDur)}</span>
+          <span class="detail-badge">${album.format} ${album.bitrate ? (album.format === 'FLAC' ? '(lossless)' : album.bitrate + ' kbps') : ''}</span>
+          ${album.label ? `<span class="detail-badge">${esc(album.label)}</span>` : ''}
+        </div>
+        <div class="detail-actions">
+          <button class="btn-primary" onclick="playAlbumDirect(${album.id})">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Play
+          </button>
+          <button class="btn-ghost" onclick="openEditModal(${album.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tracklist">
+      <div class="tracklist-header">
+        <span>#</span>
+        <span>Title</span>
+        <span>Format</span>
+        <span style="text-align:right">Duration</span>
+      </div>
+      ${album.tracks.map(t => `
+        <div class="track-row" onclick="playTrack(${t.id}, '${esc(t.title)}', '${esc(album.artist)}', '${grad}')">
+          <span class="track-num">${t.track_num}</span>
+          <span class="track-play-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </span>
+          <span class="track-title">${esc(t.title)}</span>
+          <span class="track-format">${t.format} ${t.bitrate ? (t.format === 'FLAC' ? '· lossless' : '· ' + t.bitrate + ' kbps') : ''}</span>
+          <span class="track-dur">${fmtDur(t.duration)}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showGrid() {
+  document.getElementById('grid-section').style.display = '';
+  document.getElementById('album-detail').classList.remove('visible');
+  document.getElementById('album-detail').innerHTML = '';
+  document.getElementById('back-btn').classList.remove('visible');
+  state.currentAlbum = null;
+}
+
+/* ================================================================
+   FILTERS / SEARCH
+================================================================ */
+function setFilter(type, value = null) {
+  state.filter = { type, value };
+
+  // Update sidebar active states
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.remove('active');
+    const key = `${type}:${value}`;
+    if (type === 'all' && el.dataset.filter === 'all') el.classList.add('active');
+    else if (el.dataset.filter === key) el.classList.add('active');
+  });
+
+  // Update section title
+  const titles = { all: 'Library', genre: `Genre: ${value}`, artist: value, format: `${value} files` };
+  document.getElementById('section-title').textContent = titles[type] || 'Library';
+
+  // Go back to grid if in detail
+  if (state.currentAlbum) showGrid();
+
+  loadAlbums();
+}
+
+// Search
+let searchTimer;
+document.getElementById('search-input').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  state.search = e.target.value.trim();
+  if (state.currentAlbum) showGrid();
+  searchTimer = setTimeout(loadAlbums, 250);
+});
+
+// Sort
+document.getElementById('sort-select').addEventListener('change', e => {
+  state.sort = e.target.value;
+  loadAlbums();
+});
+
+/* ================================================================
+   PLAYER
+================================================================ */
+let playerInterval;
+
+function playTrack(id, title, artist, grad) {
+  state.playing = true;
+
+  document.getElementById('player-track-name').textContent  = title;
+  document.getElementById('player-artist-name').textContent = artist;
+
+  const thumb = document.getElementById('player-thumb');
+  thumb.style.background = grad.replace('linear-gradient(135deg,', '').split(' ')[0];
+  thumb.textContent = title[0].toUpperCase();
+
+  // Simulate progress
+  clearInterval(playerInterval);
+  const duration = 240 + Math.floor(Math.random() * 180);
+  let elapsed = 0;
+  document.getElementById('prog-total').textContent = fmtDur(duration);
+  document.getElementById('progress-fill').style.width = '0%';
+
+  playerInterval = setInterval(() => {
+    elapsed++;
+    document.getElementById('prog-current').textContent = fmtDur(elapsed);
+    document.getElementById('progress-fill').style.width = `${(elapsed / duration * 100).toFixed(1)}%`;
+    if (elapsed >= duration) clearInterval(playerInterval);
+  }, 1000);
+
+  updatePlayIcon(true);
+}
+
+function playAlbum(event, albumId) {
+  event.stopPropagation();
+  playAlbumDirect(albumId);
+}
+
+async function playAlbumDirect(albumId) {
+  const data = state.currentAlbum?.id === albumId
+    ? state.currentAlbum
+    : await api(`/api/albums/${albumId}`);
+
+  if (data.tracks && data.tracks.length > 0) {
+    const t = data.tracks[0];
+    const grad = genreGradient(data.genre);
+    playTrack(t.id, t.title, data.artist, grad);
+    showToast(`Now playing: ${data.title}`, 'success');
+  }
+}
+
+function togglePlay() {
+  state.playing = !state.playing;
+  updatePlayIcon(state.playing);
+  if (!state.playing) clearInterval(playerInterval);
+}
+
+function updatePlayIcon(playing) {
+  const icon = document.getElementById('play-icon');
+  if (playing) {
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+  } else {
+    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+  }
+}
+
+function seekTo(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const pct = (event.clientX - rect.left) / rect.width;
+  document.getElementById('progress-fill').style.width = `${(pct * 100).toFixed(1)}%`;
+}
+
+/* ================================================================
+   EDIT MODAL
+================================================================ */
+function openEditModal(albumId) {
+  const album = state.currentAlbum;
+  if (!album || album.id !== albumId) return;
+
+  state.editAlbumId = albumId;
+  document.getElementById('edit-title').value  = album.title  || '';
+  document.getElementById('edit-artist').value = album.artist || '';
+  document.getElementById('edit-year').value   = album.year   || '';
+  document.getElementById('edit-genre').value  = album.genre  || '';
+  document.getElementById('edit-label').value  = album.label  || '';
+
+  document.getElementById('modal-overlay').classList.add('visible');
+}
+
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('visible');
+}
+
+async function saveEdit() {
+  const body = {
+    title:  document.getElementById('edit-title').value.trim()  || undefined,
+    artist: document.getElementById('edit-artist').value.trim() || undefined,
+    year:   parseInt(document.getElementById('edit-year').value) || undefined,
+    genre:  document.getElementById('edit-genre').value.trim()  || undefined,
+    label:  document.getElementById('edit-label').value.trim()  || undefined,
+  };
+
+  // Remove undefineds
+  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+
+  try {
+    const updated = await api(`/api/albums/${state.editAlbumId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    // Update state and re-render
+    state.currentAlbum = { ...state.currentAlbum, ...updated };
+    renderAlbumDetail(state.currentAlbum);
+    document.getElementById('modal-overlay').classList.remove('visible');
+    showToast('Album updated', 'success');
+    loadStats();
+  } catch (err) {
+    showToast('Failed to save changes', 'error');
+  }
+}
+
+/* ================================================================
+   TOAST
+================================================================ */
+let toastTimer;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+/* ================================================================
+   KEYBOARD SHORTCUTS
+================================================================ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'Escape') {
+    document.getElementById('modal-overlay').classList.remove('visible');
+    if (state.currentAlbum) showGrid();
+  }
+  if (e.code === 'Slash' || (e.ctrlKey && e.code === 'KeyF')) {
+    e.preventDefault();
+    document.getElementById('search-input').focus();
+  }
+});
+
+/* ================================================================
+   BOOT
+================================================================ */
+init().catch(console.error);
+</script>
+<footer style="text-align:center;padding:16px 0;margin-top:32px;border-top:1px solid #2a3147;color:#4a5568;font-size:13px;">
+  Developed by <a href="https://kccsonline.com" target="_blank" style="color:#8892a4;text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:#4a5568;text-decoration:none;">kccsonline.com</a>
+</footer>
+</body>
+</html>

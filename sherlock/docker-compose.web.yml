@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  sherlock-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: sherlock-web
+    ports:
+      - "8501:8501"
+    volumes:
+      - sherlock_data:/data
+    restart: unless-stopped
+    environment:
+      - SHERLOCK_DB_PATH=/data/sherlock_web.db
+      - SHERLOCK_PORT=8501
+
+volumes:
+  sherlock_data:

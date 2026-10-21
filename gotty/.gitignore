@@ -1,0 +1,11 @@
+gotty
+bindata
+builds
+js/node_modules/*
+
+# Python / GoTTY Manager
+__pycache__/
+*.py[cod]
+*.pyo
+gotty_manager/sessions.db
+gotty_manager/*.db

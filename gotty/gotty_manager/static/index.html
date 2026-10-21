@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoTTY Manager — Admin Dashboard</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --accent:   #58a6ff;
+      --accent2:  #3fb950;
+      --danger:   #f85149;
+      --warn:     #e3b341;
+      --text:     #c9d1d9;
+      --muted:    #8b949e;
+      --radius:   6px;
+      --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    header .logo span { color: var(--text); }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      background: rgba(63,185,80,0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(63,185,80,0.3);
+    }
+    .status-pill .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent2);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    header .spacer { flex: 1; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0d1117;
+    }
+    .btn-primary:hover { background: #79c0ff; }
+    .btn-danger {
+      background: transparent;
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: rgba(248,81,73,0.1); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+    }
+    .btn-ghost:hover { background: var(--border); }
+
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .stat-card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 28px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+    .panel-header .count {
+      background: var(--border);
+      border-radius: 10px;
+      padding: 1px 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .panel-header .spacer { flex: 1; }
+
+    /* ── Sessions table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.2);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-active { background: rgba(63,185,80,0.15); color: var(--accent2); border: 1px solid rgba(63,185,80,0.3); }
+    .badge-ended  { background: rgba(139,148,158,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: rgba(0,0,0,0.3);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--warn);
+    }
+
+    .duration { color: var(--muted); font-size: 13px; }
+    .session-id-short { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      width: 420px;
+      max-width: 90vw;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 16px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .form-group input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--font-mono);
+      outline: none;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 300;
+    }
+    .toast {
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      animation: slide-in 0.2s ease;
+      max-width: 320px;
+    }
+    .toast-success { background: rgba(63,185,80,0.9); color: #0d1117; }
+    .toast-error   { background: rgba(248,81,73,0.9); color: #fff; }
+    @keyframes slide-in {
+      from { transform: translateX(40px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GoTTY <span>Manager</span></div>
+  <div class="status-pill"><div class="dot"></div><span id="status-text">Connecting…</span></div>
+  <div class="spacer"></div>
+  <button class="btn btn-ghost" onclick="refreshAll()">↻ Refresh</button>
+  <button class="btn btn-primary" onclick="openCreateModal()">＋ New Session</button>
+</header>
+
+<main>
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="label">Active Sessions</div>
+      <div class="value" id="stat-active">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Sessions</div>
+      <div class="value" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">WebSocket Clients</div>
+      <div class="value" id="stat-ws">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Server</div>
+      <div class="value" style="font-size:18px;padding-top:6px;" id="stat-port">:8507</div>
+    </div>
+  </div>
+
+  <!-- Active Sessions -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Active Sessions</span>
+      <span class="count" id="active-count">0</span>
+      <div class="spacer"></div>
+    </div>
+    <div id="active-sessions-body">
+      <div class="empty-state">
+        <div class="icon">⌨️</div>
+        <p>No active sessions. Click <strong>New Session</strong> to get started.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>Session History</span>
+      <span class="count" id="history-count">0</span>
+    </div>
+    <div id="history-body">
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No session history yet.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Create Session Modal -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <h2>New Terminal Session</h2>
+    <div class="form-group">
+      <label>Label (optional)</label>
+      <input type="text" id="new-label" placeholder="My Terminal" />
+    </div>
+    <div class="form-group">
+      <label>Command (optional — defaults to system shell)</label>
+      <input type="text" id="new-command" placeholder="powershell.exe -NoLogo" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createSession()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+  const BASE = '';
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function toast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  function formatDuration(isoStart) {
+    const start = new Date(isoStart);
+    const diffMs = Date.now() - start.getTime();
+    const s = Math.floor(diffMs / 1000);
+    if (s < 60)  return `${s}s`;
+    if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
+    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
+
+  async function fetchHealth() {
+    try {
+      const r = await fetch(`${BASE}/api/health`);
+      const d = await r.json();
+      document.getElementById('status-text').textContent = 'Online';
+      document.querySelector('.status-pill').style.color = 'var(--accent2)';
+      document.getElementById('stat-active').textContent = d.active_sessions;
+    } catch {
+      document.getElementById('status-text').textContent = 'Offline';
+      document.querySelector('.dot').style.background = 'var(--danger)';
+    }
+  }
+
+  async function fetchActiveSessions() {
+    const r = await fetch(`${BASE}/api/sessions`);
+    const sessions = await r.json();
+
+    document.getElementById('active-count').textContent = sessions.length;
+    let totalWs = 0;
+    sessions.forEach(s => totalWs += (s.ws_clients || 0));
+    document.getElementById('stat-ws').textContent = totalWs;
+
+    const container = document.getElementById('active-sessions-body');
+    if (sessions.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">⌨️</div><p>No active sessions. Click <strong>New Session</strong> to get started.</p></div>`;
+      return;
+    }
+
+    let rows = sessions.map(s => `
+      <tr>
+        <td><span class="session-id-short">${esc(s.session_id.slice(0,8))}…</span></td>
+        <td><strong>${esc(s.label)}</strong></td>
+        <td><code>${esc(s.command.join(' '))}</code></td>
+        <td><span class="badge badge-active">● Active</span></td>
+        <td class="duration">${formatDuration(s.created_at)}</td>
+        <td>${esc(s.remote_addr)}</td>
+        <td>${s.ws_clients} client${s.ws_clients !== 1 ? 's' : ''}</td>
+        <td>PID ${s.pid || '—'}</td>
+        <td>
+          <a class="btn btn-ghost" href="/terminal/${esc(s.session_id)}" target="_blank" style="margin-right:6px;">Open ↗</a>
+          <button class="btn btn-danger" onclick="killSession('${esc(s.session_id)}')">Kill</button>
+        </td>
+      </tr>
+    `).join('');
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Label</th><th>Command</th><th>Status</th>
+            <th>Duration</th><th>IP</th><th>Clients</th><th>PID</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  async function fetchHistory() {
+    const r = await fetch(`${BASE}/api/history?limit=50`);
+    const history = await r.json();
+
+    document.getElementById('stat-total').textContent = history.length;
+    document.getElementById('history-count').textContent = history.length;
+
+    const container = document.getElementById('history-body');
+    if (history.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>No session history yet.</p></div>`;
+      return;
+    }
+
+    let rows = history.map(h => {
+      const active = !h.ended_at;
+      const badge = active
+        ? `<span class="badge badge-active">● Active</span>`
+        : `<span class="badge badge-ended">Ended</span>`;
+      const dur = h.ended_at
+        ? formatDuration2(h.created_at, h.ended_at)
+        : formatDuration(h.created_at);
+      return `
+        <tr>
+          <td><span class="session-id-short">${esc(h.session_id.slice(0,8))}…</span></td>
+          <td>${esc(h.label || '—')}</td>
+          <td><code>${esc(h.command ? JSON.parse(h.command).join(' ') : '—')}</code></td>
+          <td>${badge}</td>
+          <td class="duration">${dur}</td>
+          <td>${esc(h.remote_addr || '—')}</td>
+          <td>${h.exit_code !== null ? `Exit ${h.exit_code}` : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Label</th><th>Command</th><th>Status</th><th>Duration</th><th>IP</th><th>Exit</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function formatDuration2(start, end) {
+    const s = Math.floor((new Date(end) - new Date(start)) / 1000);
+    if (s < 60)  return `${s}s`;
+    if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
+    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+  }
+
+  async function refreshAll() {
+    await Promise.all([fetchHealth(), fetchActiveSessions(), fetchHistory()]);
+  }
+
+  // ── Session actions ───────────────────────────────────────────────────────
+
+  async function createSession() {
+    const label   = document.getElementById('new-label').value.trim();
+    const cmdRaw  = document.getElementById('new-command').value.trim();
+    const command = cmdRaw ? cmdRaw.split(/\s+/) : null;
+
+    try {
+      const r = await fetch(`${BASE}/api/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: label || null, command }),
+      });
+      if (!r.ok) {
+        const e = await r.json();
+        throw new Error(e.detail || 'Unknown error');
+      }
+      const session = await r.json();
+      closeCreateModal();
+      toast(`Session created: ${session.label}`);
+      await refreshAll();
+      // Open terminal in new tab
+      window.open(`/terminal/${session.session_id}?token=${session.token}`, '_blank');
+    } catch (e) {
+      toast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  async function killSession(sessionId) {
+    if (!confirm(`Kill session ${sessionId.slice(0,8)}…?`)) return;
+    try {
+      const r = await fetch(`${BASE}/api/sessions/${sessionId}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error('Request failed');
+      toast('Session terminated');
+      await refreshAll();
+    } catch (e) {
+      toast(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────
+
+  function openCreateModal() {
+    document.getElementById('create-modal').classList.add('active');
+    document.getElementById('new-label').value = '';
+    document.getElementById('new-command').value = '';
+    document.getElementById('new-label').focus();
+  }
+
+  function closeCreateModal() {
+    document.getElementById('create-modal').classList.remove('active');
+  }
+
+  document.getElementById('create-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeCreateModal();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeCreateModal();
+    if (e.key === 'Enter' && document.getElementById('create-modal').classList.contains('active')) {
+      createSession();
+    }
+  });
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+
+  refreshAll();
+  setInterval(refreshAll, 5000);
+</script>
+<footer style="text-align:center;padding:16px 0;margin-top:32px;border-top:1px solid #30363d;color:#484f58;font-size:13px;">
+  Developed by <a href="https://kccsonline.com" target="_blank" style="color:#8b949e;text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:#484f58;text-decoration:none;">kccsonline.com</a>
+</footer>
+</body>
+</html>

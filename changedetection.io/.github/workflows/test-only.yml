@@ -1,0 +1,55 @@
+name: ChangeDetection.io App Test
+
+# Triggers the workflow on push or pull request events
+on: [push, pull_request]
+
+jobs:
+  lint-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Lint with Ruff
+        run: |
+          pip install ruff
+          # Check for syntax errors and undefined names
+          ruff check . --select E9,F63,F7,F82
+          # Complete check with errors treated as warnings
+          ruff check . --exit-zero
+      - name: Validate OpenAPI spec
+        run: |
+          pip install openapi-spec-validator
+          python3 -c "from openapi_spec_validator import validate_spec; import yaml; validate_spec(yaml.safe_load(open('docs/api-spec.yaml')))"
+
+  test-application-3-10:
+    # Only run on push to master (including PR merges)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: lint-code
+    uses: ./.github/workflows/test-stack-reusable-workflow.yml
+    with:
+      python-version: '3.10'
+
+
+  test-application-3-11:
+    # Always run
+    needs: lint-code
+    uses: ./.github/workflows/test-stack-reusable-workflow.yml
+    with:
+      python-version: '3.11'
+
+  test-application-3-12:
+    # Only run on push to master (including PR merges)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: lint-code
+    uses: ./.github/workflows/test-stack-reusable-workflow.yml
+    with:
+      python-version: '3.12'
+      skip-pypuppeteer: true
+
+  test-application-3-13:
+    # Only run on push to master (including PR merges)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: lint-code
+    uses: ./.github/workflows/test-stack-reusable-workflow.yml
+    with:
+      python-version: '3.13'
+      skip-pypuppeteer: true

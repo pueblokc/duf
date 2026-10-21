@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>slides-web</title>
+<style>
+/* ================================================================
+   RESET & BASE
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --border: #30363d;
+  --green: #3fb950;
+  --orange: #d29922;
+  --red: #f85149;
+  --code-bg: #161b22;
+  --sidebar-w: 220px;
+  --notes-h: 180px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ================================================================
+   PROGRESS BAR
+   ================================================================ */
+#progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  transition: width var(--transition);
+  z-index: 1000;
+}
+
+/* ================================================================
+   TOOLBAR
+   ================================================================ */
+#toolbar {
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 900;
+  opacity: 0.35;
+  transition: opacity var(--transition);
+}
+#toolbar:hover { opacity: 1; }
+
+.tb-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all var(--transition);
+}
+.tb-btn:hover { color: var(--text); border-color: var(--accent); }
+.tb-btn.active { color: var(--accent); border-color: var(--accent); background: var(--bg-secondary); }
+
+/* ================================================================
+   MAIN LAYOUT
+   ================================================================ */
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* ================================================================
+   SIDEBAR (thumbnails)
+   ================================================================ */
+#sidebar {
+  width: 0;
+  min-width: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width var(--transition), min-width var(--transition);
+  flex-shrink: 0;
+}
+#sidebar.open {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.thumb {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.thumb:hover { background: var(--bg-tertiary); }
+.thumb.active { background: var(--bg-tertiary); color: var(--accent); border-left: 3px solid var(--accent); }
+.thumb-num {
+  font-weight: 700;
+  min-width: 20px;
+  color: inherit;
+}
+.thumb-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+/* ================================================================
+   SLIDE AREA
+   ================================================================ */
+#slide-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+
+#slide-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 60px;
+  overflow: auto;
+  position: relative;
+}
+
+/* Fade transition */
+#slide-content {
+  max-width: 900px;
+  width: 100%;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+#slide-content.fade-out { opacity: 0; }
+
+/* ================================================================
+   SLIDE TYPOGRAPHY
+   ================================================================ */
+#slide-content h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 0.5em;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+#slide-content h2 {
+  font-size: 2.2rem;
+  font-weight: 600;
+  margin-bottom: 0.5em;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+}
+#slide-content h3 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 0.5em;
+  color: var(--text-muted);
+}
+#slide-content p {
+  font-size: 1.25rem;
+  line-height: 1.7;
+  margin-bottom: 0.8em;
+  color: var(--text);
+}
+#slide-content ul, #slide-content ol {
+  font-size: 1.2rem;
+  line-height: 1.8;
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+#slide-content li { margin-bottom: 0.3em; }
+#slide-content strong { color: #fff; }
+#slide-content em { color: var(--text-muted); font-style: italic; }
+#slide-content code {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 0.9em;
+  color: var(--orange);
+}
+#slide-content pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+#slide-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+#slide-content blockquote {
+  border-left: 4px solid var(--accent);
+  padding: 0.6em 1.2em;
+  margin: 1em 0;
+  color: var(--text-muted);
+  font-style: italic;
+  background: rgba(88, 166, 255, 0.05);
+  border-radius: 0 6px 6px 0;
+}
+#slide-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 1.1rem;
+}
+#slide-content th {
+  background: var(--bg-tertiary);
+  padding: 10px 16px;
+  text-align: left;
+  border-bottom: 2px solid var(--accent);
+  font-weight: 600;
+}
+#slide-content td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+#slide-content tr:hover td { background: rgba(255,255,255,0.02); }
+#slide-content a { color: var(--accent); text-decoration: none; }
+#slide-content a:hover { text-decoration: underline; }
+#slide-content del { color: var(--text-muted); }
+
+/* codehilite (pygments inline styles already applied, just tweak container) */
+#slide-content .codehilite {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+#slide-content .codehilite pre { background: none; border: none; padding: 0; margin: 0; }
+
+/* ================================================================
+   SPEAKER NOTES
+   ================================================================ */
+#notes-panel {
+  height: 0;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  transition: height var(--transition);
+  flex-shrink: 0;
+}
+#notes-panel.open { height: var(--notes-h); }
+#notes-inner {
+  padding: 16px 24px;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  overflow-y: auto;
+  height: 100%;
+}
+#notes-inner .notes-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* ================================================================
+   SLIDE COUNTER
+   ================================================================ */
+#counter {
+  position: fixed;
+  bottom: 16px;
+  right: 20px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  z-index: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+   NAV ARROWS (subtle)
+   ================================================================ */
+.nav-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 24px;
+  opacity: 0;
+  transition: opacity var(--transition);
+  z-index: 800;
+  border: none;
+  background: none;
+  user-select: none;
+}
+#slide-area:hover .nav-arrow { opacity: 0.3; }
+.nav-arrow:hover { opacity: 1 !important; color: var(--accent); }
+#nav-prev { left: 12px; }
+#nav-next { right: 50px; }
+
+/* ================================================================
+   PASTE MODAL
+   ================================================================ */
+#paste-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+#paste-modal.open { display: flex; }
+
+#paste-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 720px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#paste-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+#paste-header h3 { font-size: 1rem; font-weight: 600; }
+#paste-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+#paste-close:hover { color: var(--text); }
+#paste-textarea {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  padding: 20px;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.9rem;
+  resize: none;
+  min-height: 400px;
+  line-height: 1.5;
+}
+#paste-textarea:focus { outline: none; }
+#paste-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+.modal-btn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+.modal-btn.secondary { background: var(--bg-tertiary); color: var(--text-muted); }
+.modal-btn.secondary:hover { color: var(--text); }
+.modal-btn.primary { background: var(--accent-dim); color: #fff; border-color: var(--accent); }
+.modal-btn.primary:hover { background: var(--accent); }
+
+/* ================================================================
+   HELP OVERLAY
+   ================================================================ */
+#help-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+#help-overlay.open { display: flex; }
+
+#help-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 40px;
+  max-width: 480px;
+  width: 90vw;
+}
+#help-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  color: var(--accent);
+}
+.shortcut-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.shortcut-row:last-child { border-bottom: none; }
+.shortcut-key {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+/* ================================================================
+   FOOTER
+   ================================================================ */
+#footer {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.3;
+  z-index: 100;
+  white-space: nowrap;
+}
+#footer a { color: var(--accent); text-decoration: none; }
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 768px) {
+  #slide-viewport { padding: 24px 20px; }
+  #slide-content h1 { font-size: 2rem; }
+  #slide-content h2 { font-size: 1.5rem; }
+  #slide-content p, #slide-content li { font-size: 1rem; }
+  :root { --sidebar-w: 180px; }
+  .nav-arrow { display: none; }
+  #toolbar { top: 6px; right: 6px; }
+  .tb-btn { width: 30px; height: 30px; font-size: 14px; }
+}
+
+/* ================================================================
+   PRINT / PDF
+   ================================================================ */
+@media print {
+  *, *::before, *::after { color: #000 !important; background: #fff !important; }
+  #toolbar, #counter, #progress, #footer, .nav-arrow, #sidebar, #notes-panel { display: none !important; }
+  #slide-viewport { padding: 0; }
+  #slide-content { max-width: 100%; }
+  #slide-content h1, #slide-content h2 { color: #000 !important; }
+  #slide-content pre, #slide-content code, #slide-content .codehilite {
+    border-color: #ccc !important;
+  }
+  .print-page-break { page-break-after: always; }
+}
+
+/* Touch swipe hint */
+@media (pointer: coarse) {
+  #counter::after { content: "  swipe \2194"; }
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress" style="width: 0%"></div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button class="tb-btn" id="btn-sidebar" title="Thumbnails (S)">&#9776;</button>
+  <button class="tb-btn" id="btn-notes" title="Speaker Notes (N)">&#128172;</button>
+  <button class="tb-btn" id="btn-paste" title="Paste Markdown (E)">&#9998;</button>
+  <button class="tb-btn" id="btn-print" title="Print / PDF (P)">&#128424;</button>
+  <button class="tb-btn" id="btn-help" title="Help (?)">?</button>
+</div>
+
+<!-- Main layout -->
+<div id="app">
+  <!-- Sidebar -->
+  <div id="sidebar"></div>
+
+  <!-- Slide area -->
+  <div id="slide-area">
+    <button class="nav-arrow" id="nav-prev">&#10094;</button>
+    <button class="nav-arrow" id="nav-next">&#10095;</button>
+
+    <div id="slide-viewport">
+      <div id="slide-content"></div>
+    </div>
+
+    <!-- Speaker notes -->
+    <div id="notes-panel">
+      <div id="notes-inner">
+        <div class="notes-label">Speaker Notes</div>
+        <div id="notes-text">No notes for this slide.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide counter -->
+<div id="counter">0 / 0</div>
+
+<!-- Footer -->
+<div id="footer">slides-web &mdash; <a href="https://kccsonline.com" target="_blank">KCCS</a></div>
+
+<!-- Paste modal -->
+<div id="paste-modal">
+  <div id="paste-box">
+    <div id="paste-header">
+      <h3>Paste Markdown</h3>
+      <button id="paste-close">&times;</button>
+    </div>
+    <textarea id="paste-textarea" placeholder="Paste your Markdown here...&#10;&#10;Separate slides with --- on its own line."></textarea>
+    <div id="paste-footer">
+      <button class="modal-btn secondary" id="paste-cancel">Cancel</button>
+      <button class="modal-btn primary" id="paste-submit">Present</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help overlay -->
+<div id="help-overlay">
+  <div id="help-card">
+    <h3>Keyboard Shortcuts</h3>
+    <div class="shortcut-row"><span>Next slide</span><span><span class="shortcut-key">&rarr;</span> <span class="shortcut-key">Space</span> <span class="shortcut-key">Enter</span></span></div>
+    <div class="shortcut-row"><span>Previous slide</span><span><span class="shortcut-key">&larr;</span> <span class="shortcut-key">Backspace</span></span></div>
+    <div class="shortcut-row"><span>First slide</span><span><span class="shortcut-key">Home</span></span></div>
+    <div class="shortcut-row"><span>Last slide</span><span><span class="shortcut-key">End</span></span></div>
+    <div class="shortcut-row"><span>Toggle sidebar</span><span><span class="shortcut-key">S</span></span></div>
+    <div class="shortcut-row"><span>Toggle notes</span><span><span class="shortcut-key">N</span></span></div>
+    <div class="shortcut-row"><span>Paste markdown</span><span><span class="shortcut-key">E</span></span></div>
+    <div class="shortcut-row"><span>Print / PDF</span><span><span class="shortcut-key">P</span></span></div>
+    <div class="shortcut-row"><span>Fullscreen</span><span><span class="shortcut-key">F</span></span></div>
+    <div class="shortcut-row"><span>Help</span><span><span class="shortcut-key">?</span></span></div>
+    <br>
+    <div style="text-align:center;color:var(--text-muted);font-size:0.8rem;">Press any key to close</div>
+  </div>
+</div>
+
+<script>
+/* =================================================================
+   STATE
+   ================================================================= */
+let slides = [];
+let current = 0;
+let wsConn = null;
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+/* =================================================================
+   FETCH SLIDES
+   ================================================================= */
+async function fetchSlides() {
+  try {
+    const res = await fetch('/api/slides');
+    const data = await res.json();
+    slides = data.slides || [];
+    if (data.frontmatter && data.frontmatter.title) {
+      document.title = data.frontmatter.title + ' — slides-web';
+    }
+    current = 0;
+    buildThumbnails();
+    showSlide(0);
+  } catch (err) {
+    console.error('Failed to fetch slides:', err);
+    $('#slide-content').innerHTML = '<h2 style="color:var(--red)">Failed to load slides</h2><p>' + err.message + '</p>';
+  }
+}
+
+/* =================================================================
+   RENDER SLIDE
+   ================================================================= */
+function showSlide(index, skipAnim) {
+  if (index < 0 || index >= slides.length) return;
+
+  const el = $('#slide-content');
+  if (!skipAnim && index !== current) {
+    el.classList.add('fade-out');
+    setTimeout(() => {
+      current = index;
+      renderCurrent();
+      el.classList.remove('fade-out');
+    }, 150);
+  } else {
+    current = index;
+    renderCurrent();
+  }
+}
+
+function renderCurrent() {
+  const slide = slides[current];
+  if (!slide) return;
+
+  $('#slide-content').innerHTML = slide.html;
+
+  // Notes
+  const notesText = slide.notes || 'No notes for this slide.';
+  $('#notes-text').textContent = notesText;
+
+  // Counter
+  $('#counter').textContent = (current + 1) + ' / ' + slides.length;
+
+  // Progress
+  const pct = slides.length > 1 ? ((current) / (slides.length - 1)) * 100 : 100;
+  $('#progress').style.width = pct + '%';
+
+  // Active thumbnail
+  $$('.thumb').forEach((t, i) => {
+    t.classList.toggle('active', i === current);
+  });
+
+  // Scroll active thumbnail into view
+  const activeThumb = $('.thumb.active');
+  if (activeThumb) {
+    activeThumb.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+/* =================================================================
+   THUMBNAILS
+   ================================================================= */
+function buildThumbnails() {
+  const sidebar = $('#sidebar');
+  sidebar.innerHTML = '';
+  slides.forEach((slide, i) => {
+    const div = document.createElement('div');
+    div.className = 'thumb' + (i === current ? ' active' : '');
+
+    // Extract a short title from the slide content
+    const tmp = document.createElement('div');
+    tmp.innerHTML = slide.html;
+    let label = tmp.textContent.trim().substring(0, 60);
+    if (label.length >= 60) label += '...';
+
+    div.innerHTML = '<span class="thumb-num">' + (i + 1) + '</span><span class="thumb-text">' + escapeHTML(label) + '</span>';
+    div.addEventListener('click', () => showSlide(i));
+    sidebar.appendChild(div);
+  });
+}
+
+function escapeHTML(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* =================================================================
+   NAVIGATION
+   ================================================================= */
+function next() {
+  if (current < slides.length - 1) {
+    showSlide(current + 1);
+    broadcastNav(current);
+  }
+}
+
+function prev() {
+  if (current > 0) {
+    showSlide(current - 1);
+    broadcastNav(current);
+  }
+}
+
+/* =================================================================
+   WEBSOCKET
+   ================================================================= */
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  wsConn = new WebSocket(proto + '://' + location.host + '/ws');
+  wsConn.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'navigate') {
+        showSlide(msg.index);
+      } else if (msg.type === 'reload') {
+        slides = msg.data.slides || [];
+        current = 0;
+        buildThumbnails();
+        showSlide(0);
+      }
+    } catch {}
+  };
+  wsConn.onclose = () => {
+    setTimeout(connectWS, 3000);
+  };
+  wsConn.onerror = () => {
+    wsConn.close();
+  };
+}
+
+function broadcastNav(index) {
+  if (wsConn && wsConn.readyState === WebSocket.OPEN) {
+    wsConn.send(JSON.stringify({ type: 'navigate', index: index }));
+  }
+}
+
+/* =================================================================
+   PASTE MODAL
+   ================================================================= */
+function openPaste() {
+  $('#paste-modal').classList.add('open');
+  $('#paste-textarea').focus();
+}
+
+function closePaste() {
+  $('#paste-modal').classList.remove('open');
+}
+
+async function submitPaste() {
+  const md = $('#paste-textarea').value.trim();
+  if (!md) return;
+  try {
+    const res = await fetch('/api/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: md }),
+    });
+    const data = await res.json();
+    slides = data.slides || [];
+    current = 0;
+    buildThumbnails();
+    showSlide(0);
+    closePaste();
+  } catch (err) {
+    alert('Error loading markdown: ' + err.message);
+  }
+}
+
+/* =================================================================
+   HELP OVERLAY
+   ================================================================= */
+function toggleHelp() {
+  const h = $('#help-overlay');
+  if (h.classList.contains('open')) {
+    h.classList.remove('open');
+  } else {
+    h.classList.add('open');
+  }
+}
+
+/* =================================================================
+   KEYBOARD
+   ================================================================= */
+document.addEventListener('keydown', (e) => {
+  // If typing in textarea, ignore nav keys
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+    if (e.key === 'Escape') closePaste();
+    return;
+  }
+
+  // Close help on any key
+  if ($('#help-overlay').classList.contains('open')) {
+    $('#help-overlay').classList.remove('open');
+    e.preventDefault();
+    return;
+  }
+
+  // Close paste modal on Escape
+  if (e.key === 'Escape') {
+    closePaste();
+    return;
+  }
+
+  switch (e.key) {
+    case 'ArrowRight':
+    case ' ':
+    case 'Enter':
+      e.preventDefault();
+      next();
+      break;
+    case 'ArrowLeft':
+    case 'Backspace':
+      e.preventDefault();
+      prev();
+      break;
+    case 'Home':
+      e.preventDefault();
+      showSlide(0);
+      break;
+    case 'End':
+      e.preventDefault();
+      showSlide(slides.length - 1);
+      break;
+    case 's':
+    case 'S':
+      e.preventDefault();
+      toggleSidebar();
+      break;
+    case 'n':
+    case 'N':
+      e.preventDefault();
+      toggleNotes();
+      break;
+    case 'e':
+    case 'E':
+      e.preventDefault();
+      openPaste();
+      break;
+    case 'p':
+    case 'P':
+      e.preventDefault();
+      window.print();
+      break;
+    case 'f':
+    case 'F':
+      e.preventDefault();
+      toggleFullscreen();
+      break;
+    case '?':
+      e.preventDefault();
+      toggleHelp();
+      break;
+  }
+});
+
+/* =================================================================
+   TOGGLE PANELS
+   ================================================================= */
+function toggleSidebar() {
+  const sb = $('#sidebar');
+  sb.classList.toggle('open');
+  $('#btn-sidebar').classList.toggle('active');
+}
+
+function toggleNotes() {
+  const np = $('#notes-panel');
+  np.classList.toggle('open');
+  $('#btn-notes').classList.toggle('active');
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+/* =================================================================
+   TOUCH / SWIPE
+   ================================================================= */
+let touchStartX = 0;
+document.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+});
+document.addEventListener('touchend', (e) => {
+  const diff = e.changedTouches[0].screenX - touchStartX;
+  if (Math.abs(diff) > 60) {
+    if (diff < 0) next();
+    else prev();
+  }
+});
+
+/* =================================================================
+   TOOLBAR BUTTONS
+   ================================================================= */
+$('#btn-sidebar').addEventListener('click', toggleSidebar);
+$('#btn-notes').addEventListener('click', toggleNotes);
+$('#btn-paste').addEventListener('click', openPaste);
+$('#btn-print').addEventListener('click', () => window.print());
+$('#btn-help').addEventListener('click', toggleHelp);
+$('#nav-prev').addEventListener('click', prev);
+$('#nav-next').addEventListener('click', next);
+$('#paste-close').addEventListener('click', closePaste);
+$('#paste-cancel').addEventListener('click', closePaste);
+$('#paste-submit').addEventListener('click', submitPaste);
+
+/* =================================================================
+   INIT
+   ================================================================= */
+fetchSlides();
+connectWS();
+</script>
+</body>
+</html>

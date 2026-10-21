@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sampler — web dashboard</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0a0d0a;
+      --bg2:         #0e120e;
+      --panel:       #111611;
+      --border:      #1e2d1e;
+      --border-hi:   #2a4a2a;
+      --green:       #00ff88;
+      --green-dim:   #00aa55;
+      --cyan:        #00ccff;
+      --amber:       #ffaf00;
+      --red:         #ff4444;
+      --text:        #c8ffcc;
+      --text-dim:    #5a8a5a;
+      --text-muted:  #2e4e2e;
+      --font:        'Fira Code', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+      --font-size:   13px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: var(--font-size);
+      overflow-x: hidden;
+    }
+
+    /* ── Header bar ──────────────────────────────────────────────────────── */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #header .logo {
+      color: var(--green);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #header .logo span { color: var(--text-dim); font-size: 12px; font-weight: 400; margin-left: 8px; }
+    #header .meta {
+      display: flex; gap: 18px; align-items: center;
+    }
+    .meta-item { color: var(--text-dim); font-size: 11px; }
+    .meta-item strong { color: var(--green); }
+    #conn-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); display: inline-block;
+      margin-right: 5px; vertical-align: middle;
+      transition: background 0.4s;
+    }
+    #conn-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    /* ── Main grid ────────────────────────────────────────────────────────── */
+    #dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+      padding: 12px;
+    }
+
+    /* ── Widget card ─────────────────────────────────────────────────────── */
+    .widget {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      min-height: 160px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .widget:hover { border-color: var(--border-hi); }
+
+    .widget-title {
+      padding: 5px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--green-dim);
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,255,136,0.03);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .widget-title .wtype {
+      color: var(--text-muted);
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+    }
+
+    .widget-body { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+
+    /* ── Sparkline widget ─────────────────────────────────────────────────── */
+    .sparkline-canvas {
+      width: 100%;
+      height: 80px;
+      display: block;
+    }
+    .sparkline-value {
+      text-align: right;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+      margin-top: 4px;
+    }
+    .sparkline-label { font-size: 10px; color: var(--text-dim); }
+
+    /* ── Gauge widget ─────────────────────────────────────────────────────── */
+    .gauge-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .gauge-arc-wrap { position: relative; }
+    .gauge-canvas { display: block; }
+    .gauge-pct {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      text-align: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--green);
+    }
+    .gauge-label { font-size: 10px; color: var(--text-dim); text-align: center; }
+    .gauge-minmax {
+      display: flex; justify-content: space-between; width: 100%;
+      font-size: 10px; color: var(--text-muted);
+    }
+
+    /* ── Bar chart widget ─────────────────────────────────────────────────── */
+    .bar-list { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .bar-item {}
+    .bar-label-row {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--text-dim); margin-bottom: 2px;
+    }
+    .bar-label-row .bar-val { color: var(--green); font-weight: 700; }
+    .bar-track {
+      height: 8px;
+      background: var(--bg2);
+      border-radius: 2px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Textbox widget ───────────────────────────────────────────────────── */
+    .textbox-content {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text);
+      line-height: 1.6;
+      white-space: pre;
+      overflow-y: auto;
+      overflow-x: hidden;
+      font-family: var(--font);
+      max-height: 200px;
+    }
+    .textbox-content::-webkit-scrollbar { width: 3px; }
+    .textbox-content::-webkit-scrollbar-thumb { background: var(--border-hi); }
+
+    /* ── ASCII box widget ─────────────────────────────────────────────────── */
+    .asciibox-content {
+      flex: 1;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--green);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 3px;
+      white-space: pre;
+      line-height: 1.2;
+    }
+
+    /* ── Runchart widget ─────────────────────────────────────────────────── */
+    .runchart-legend {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;
+    }
+    .legend-item {
+      font-size: 10px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    /* ── Utility ─────────────────────────────────────────────────────────── */
+    .scanline {
+      pointer-events: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.06) 3px,
+        rgba(0,0,0,0.06) 4px
+      );
+      z-index: 9999;
+    }
+
+    .corner {
+      position: absolute;
+      width: 5px; height: 5px;
+      border-color: var(--green-dim);
+      border-style: solid;
+    }
+    .corner.tl { top: 0; left: 0; border-width: 1px 0 0 1px; }
+    .corner.tr { top: 0; right: 0; border-width: 1px 1px 0 0; }
+    .corner.bl { bottom: 0; left: 0; border-width: 0 0 1px 1px; }
+    .corner.br { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+
+    #footer {
+      padding: 4px 16px;
+      font-size: 10px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+    }
+    #footer a { color: var(--green-dim); text-decoration: none; }
+    #footer a:hover { color: var(--green); }
+
+    /* ── Demo badge ──────────────────────────────────────────────────────── */
+    #demo-badge {
+      background: var(--amber);
+      color: #000;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 2px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Pulse animation on update ───────────────────────────────────────── */
+    @keyframes pulse-border {
+      0%   { border-color: var(--green); }
+      100% { border-color: var(--border); }
+    }
+    .widget.updated { animation: pulse-border 0.6s ease-out forwards; }
+  </style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<div id="header">
+  <div class="logo">
+    ▓ sampler<span>web companion</span>
+  </div>
+  <div class="meta">
+    <div class="meta-item" id="demo-badge-wrap"></div>
+    <div class="meta-item"><span id="conn-dot"></span><span id="conn-label">connecting…</span></div>
+    <div class="meta-item">widgets: <strong id="wcount">0</strong></div>
+    <div class="meta-item">updated: <strong id="last-update">—</strong></div>
+    <div class="meta-item">clients: <strong id="client-count">—</strong></div>
+  </div>
+</div>
+
+<!-- ── Dashboard grid ─────────────────────────────────────────────────────── -->
+<div id="dashboard"></div>
+
+<div id="footer">
+  <span>sampler-web v0.1.0 &nbsp;|&nbsp; <a href="https://github.com/pueblokc/sampler" target="_blank">github.com/pueblokc/sampler</a></span>
+  <span id="footer-ts"></span>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   sampler-web frontend
+   Connects via WebSocket, renders widgets using Canvas + DOM.
+═══════════════════════════════════════════════════════════════════════════ */
+
+const $ = id => document.getElementById(id);
+const COL = {
+  bg:     '#0a0d0a',
+  panel:  '#111611',
+  border: '#1e2d1e',
+  green:  '#00ff88',
+  dim:    '#00aa55',
+  cyan:   '#00ccff',
+  amber:  '#ffaf00',
+  red:    '#ff4444',
+  text:   '#c8ffcc',
+  muted:  '#2e4e2e',
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let widgets = {};   // id → {config, el, canvases, ...}
+let ws = null;
+let reconnectTimer = null;
+let demoMode = false;
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+  ws.onopen = () => {
+    $('conn-dot').className = 'connected';
+    $('conn-label').textContent = 'connected';
+    clearTimeout(reconnectTimer);
+  };
+
+  ws.onmessage = evt => {
+    try {
+      const msg = JSON.parse(evt.data);
+      if (msg.ping) return;
+      renderAll(msg.widgets);
+      $('last-update').textContent = new Date(msg.ts * 1000).toLocaleTimeString();
+      $('footer-ts').textContent = new Date().toLocaleString();
+    } catch(e) { console.error(e); }
+  };
+
+  ws.onclose = ws.onerror = () => {
+    $('conn-dot').className = '';
+    $('conn-label').textContent = 'reconnecting…';
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+}
+
+// Pull status once for demo badge + client count
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const s = await r.json();
+    demoMode = s.demo_mode;
+    if (demoMode) {
+      $('demo-badge-wrap').innerHTML = '<span id="demo-badge">DEMO</span>';
+    }
+    $('client-count').textContent = s.clients;
+  } catch(e) {}
+  setTimeout(pollStatus, 5000);
+}
+
+// ── Render dispatcher ─────────────────────────────────────────────────────────
+function renderAll(wlist) {
+  $('wcount').textContent = wlist.length;
+
+  // Build/update widget cards
+  wlist.forEach(w => {
+    if (!widgets[w.id]) buildCard(w);
+    updateCard(w);
+  });
+}
+
+// ── Card construction ─────────────────────────────────────────────────────────
+function buildCard(w) {
+  const dash = $('dashboard');
+  const card = document.createElement('div');
+  card.className = 'widget';
+  card.id = `card-${w.id}`;
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'widget-title';
+  titleEl.innerHTML = `<span>${esc(w.title)}</span><span class="wtype">${w.type}</span>`;
+  card.appendChild(titleEl);
+
+  // Corners
+  ['tl','tr','bl','br'].forEach(c => {
+    const d = document.createElement('div');
+    d.className = `corner ${c}`;
+    card.appendChild(d);
+  });
+
+  const body = document.createElement('div');
+  body.className = 'widget-body';
+  body.id = `body-${w.id}`;
+  card.appendChild(body);
+
+  dash.appendChild(card);
+
+  // Track state
+  widgets[w.id] = { config: w, el: card, bodyEl: body, built: false };
+}
+
+function updateCard(w) {
+  const state = widgets[w.id];
+  if (!state) return;
+
+  const body = state.bodyEl;
+
+  // First-time body construction by type
+  if (!state.built) {
+    switch (w.type) {
+      case 'sparkline': buildSparklineBody(body, w, state); break;
+      case 'runchart':  buildRunChartBody(body, w, state);  break;
+      case 'gauge':     buildGaugeBody(body, w, state);     break;
+      case 'barchart':  buildBarBody(body, w, state);        break;
+      case 'textbox':   buildTextBody(body, w, state);       break;
+      case 'asciibox':  buildAsciiBody(body, w, state);      break;
+    }
+    state.built = true;
+  }
+
+  // Data update
+  switch (w.type) {
+    case 'sparkline': drawSparkline(w, state);  break;
+    case 'runchart':  drawRunChart(w, state);   break;
+    case 'gauge':     drawGauge(w, state);       break;
+    case 'barchart':  drawBars(w, state);        break;
+    case 'textbox':   updateText(w, state);      break;
+    case 'asciibox':  updateAscii(w, state);     break;
+  }
+
+  // Pulse animation
+  state.el.classList.remove('updated');
+  void state.el.offsetWidth;
+  state.el.classList.add('updated');
+}
+
+// ── Sparkline ─────────────────────────────────────────────────────────────────
+function buildSparklineBody(body, w, state) {
+  const item = w.items[0] || {};
+  state.canvases = [];
+
+  const labelEl = document.createElement('div');
+  labelEl.className = 'sparkline-label';
+  labelEl.textContent = item.label || '';
+  body.appendChild(labelEl);
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'sparkline-canvas';
+  canvas.height = 80;
+  body.appendChild(canvas);
+  state.canvases.push(canvas);
+
+  const valEl = document.createElement('div');
+  valEl.className = 'sparkline-value';
+  valEl.id = `sv-${w.id}`;
+  valEl.style.color = item.color || COL.green;
+  body.appendChild(valEl);
+  state.valEl = valEl;
+}
+
+function drawSparkline(w, state) {
+  const item = w.items[0];
+  if (!item) return;
+  const canvas = state.canvases[0];
+  if (!canvas) return;
+
+  const hist = item.history;
+  const color = item.color || COL.green;
+
+  // Resize canvas to actual CSS size
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  || canvas.offsetWidth  || 280;
+  canvas.height = rect.height || canvas.offsetHeight || 80;
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!hist.length) return;
+
+  const vals   = hist.map(Number);
+  const minVal = Math.min(...vals);
+  const maxVal = Math.max(...vals);
+  const range  = maxVal - minVal || 1;
+  const pad    = 4;
+
+  // Grid lines
+  ctx.strokeStyle = COL.border;
+  ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(f => {
+    const y = pad + (1 - f) * (H - pad * 2);
+    ctx.beginPath();
+    ctx.moveTo(0, y); ctx.lineTo(W, y);
+    ctx.stroke();
+  });
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, hexAlpha(color, 0.25));
+  grad.addColorStop(1, hexAlpha(color, 0.0));
+  ctx.fillStyle = grad;
+
+  // Line + fill
+  ctx.beginPath();
+  vals.forEach((v, i) => {
+    const x = (i / (vals.length - 1 || 1)) * W;
+    const y = pad + (1 - (v - minVal) / range) * (H - pad * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  // Fill to bottom
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.fill();
+
+  // Line itself
+  ctx.beginPath();
+  vals.forEach((v, i) => {
+    const x = (i / (vals.length - 1 || 1)) * W;
+    const y = pad + (1 - (v - minVal) / range) * (H - pad * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Last point dot
+  const last = vals[vals.length - 1];
+  const lx   = W;
+  const ly   = pad + (1 - (last - minVal) / range) * (H - pad * 2);
+  ctx.beginPath();
+  ctx.arc(lx - 1, ly, 3, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // Update numeric value
+  const cur = item.current;
+  const disp = typeof cur === 'number' ? cur.toFixed(1) : cur;
+  state.valEl.textContent = disp;
+  state.valEl.style.color = color;
+}
+
+// ── RunChart (multi-line sparkline) ───────────────────────────────────────────
+function buildRunChartBody(body, w, state) {
+  // Legend
+  const legend = document.createElement('div');
+  legend.className = 'runchart-legend';
+  w.items.forEach(item => {
+    const li = document.createElement('div');
+    li.className = 'legend-item';
+    li.innerHTML = `<span class="legend-dot" style="background:${item.color}"></span><span>${esc(item.label)}</span>`;
+    legend.appendChild(li);
+  });
+  body.appendChild(legend);
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'sparkline-canvas';
+  canvas.style.height = '110px';
+  canvas.height = 110;
+  body.appendChild(canvas);
+  state.canvases = [canvas];
+  state.el.style.minHeight = '180px';
+}
+
+function drawRunChart(w, state) {
+  const canvas = state.canvases[0];
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  || 280;
+  canvas.height = rect.height || 110;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const allVals = w.items.flatMap(it => it.history.map(Number));
+  if (!allVals.length) return;
+  const minVal = Math.min(...allVals);
+  const maxVal = Math.max(...allVals);
+  const range  = maxVal - minVal || 1;
+  const pad    = 4;
+
+  // Grid
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(f => {
+    const y = pad + (1 - f) * (H - pad * 2);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  });
+
+  w.items.forEach(item => {
+    const vals = item.history.map(Number);
+    if (!vals.length) return;
+    ctx.beginPath();
+    vals.forEach((v, i) => {
+      const x = (i / (vals.length - 1 || 1)) * W;
+      const y = pad + (1 - (v - minVal) / range) * (H - pad * 2);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = item.color || COL.green;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+}
+
+// ── Gauge ─────────────────────────────────────────────────────────────────────
+function buildGaugeBody(body, w, state) {
+  const wrap = document.createElement('div');
+  wrap.className = 'gauge-wrap';
+
+  const arcWrap = document.createElement('div');
+  arcWrap.className = 'gauge-arc-wrap';
+  arcWrap.style.width  = '160px';
+  arcWrap.style.height = '90px';
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'gauge-canvas';
+  canvas.width  = 160;
+  canvas.height = 90;
+  arcWrap.appendChild(canvas);
+
+  const pctEl = document.createElement('div');
+  pctEl.className = 'gauge-pct';
+  pctEl.id = `gp-${w.id}`;
+  arcWrap.appendChild(pctEl);
+
+  wrap.appendChild(arcWrap);
+
+  const mmEl = document.createElement('div');
+  mmEl.className = 'gauge-minmax';
+  mmEl.innerHTML = `<span id="gmin-${w.id}">${w.min}</span><span id="gmax-${w.id}">${w.max}</span>`;
+  wrap.appendChild(mmEl);
+
+  body.appendChild(wrap);
+  state.canvases = [canvas];
+  state.el.style.minHeight = '180px';
+}
+
+function drawGauge(w, state) {
+  const canvas = state.canvases[0];
+  const item   = w.items[0];
+  if (!item) return;
+
+  const ctx  = canvas.getContext('2d');
+  const W = 160, H = 90;
+  const cx = W / 2, cy = H - 10;
+  const R  = 70;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const minV = w.min || 0;
+  const maxV = w.max || 100;
+  const cur  = typeof item.current === 'number' ? item.current : parseFloat(item.current) || 0;
+  const pct  = Math.max(0, Math.min(1, (cur - minV) / (maxV - minV)));
+
+  // Determine colour from thresholds
+  let color = item.color || COL.green;
+  if (w.thresholds && w.thresholds.length) {
+    for (const t of w.thresholds) {
+      if (t.value !== undefined && cur >= t.value) {
+        color = t.color || color;
+      }
+    }
+  }
+  // Auto colour for percentage gauges
+  if (!w.thresholds || !w.thresholds.length) {
+    if (pct > 0.9) color = COL.red;
+    else if (pct > 0.7) color = COL.amber;
+    else color = item.color || COL.green;
+  }
+
+  const startAngle = Math.PI;
+  const endAngle   = Math.PI * 2;
+  const fillAngle  = startAngle + pct * Math.PI;
+
+  // Track
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, startAngle, endAngle);
+  ctx.strokeStyle = '#1a2a1a';
+  ctx.lineWidth   = 14;
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+
+  // Fill
+  if (pct > 0) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, startAngle, fillAngle);
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 14;
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 8;
+    ctx.stroke();
+    ctx.shadowBlur  = 0;
+  }
+
+  // Needle
+  const needleAngle = startAngle + pct * Math.PI;
+  const nx = cx + (R - 2) * Math.cos(needleAngle);
+  const ny = cy + (R - 2) * Math.sin(needleAngle);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(nx, ny);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = 2;
+  ctx.stroke();
+
+  // Centre dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  // Ticks
+  ctx.strokeStyle = '#2e4e2e'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    const a = Math.PI + (i / 10) * Math.PI;
+    const r1 = R + 4, r2 = R + 10;
+    ctx.beginPath();
+    ctx.moveTo(cx + r1 * Math.cos(a), cy + r1 * Math.sin(a));
+    ctx.lineTo(cx + r2 * Math.cos(a), cy + r2 * Math.sin(a));
+    ctx.stroke();
+  }
+
+  // Update DOM value
+  const pctEl = $(`gp-${w.id}`);
+  if (pctEl) { pctEl.textContent = `${(pct * 100).toFixed(0)}%`; pctEl.style.color = color; }
+  const minEl = $(`gmin-${w.id}`);
+  const maxEl = $(`gmax-${w.id}`);
+  if (minEl) minEl.textContent = minV.toFixed(0);
+  if (maxEl) maxEl.textContent = maxV.toFixed(0);
+}
+
+// ── Bar chart ─────────────────────────────────────────────────────────────────
+function buildBarBody(body, w, state) {
+  const list = document.createElement('div');
+  list.className = 'bar-list';
+  list.id = `bl-${w.id}`;
+  body.appendChild(list);
+  state.el.style.minHeight = `${Math.max(160, w.items.length * 40 + 40)}px`;
+}
+
+function drawBars(w, state) {
+  const list = $(`bl-${w.id}`);
+  if (!list) return;
+
+  const allVals = w.items.map(it => typeof it.current === 'number' ? it.current : parseFloat(it.current) || 0);
+  const maxVal  = Math.max(...allVals, 1);
+
+  // Rebuild bars (simple — just clear and repopulate)
+  list.innerHTML = '';
+  w.items.forEach((item, i) => {
+    const cur   = allVals[i];
+    const pct   = Math.min(100, (cur / maxVal) * 100);
+    const color = item.color || COL.green;
+
+    const div  = document.createElement('div');
+    div.className = 'bar-item';
+
+    const labelRow = document.createElement('div');
+    labelRow.className = 'bar-label-row';
+    labelRow.innerHTML = `<span>${esc(item.label)}</span><span class="bar-val" style="color:${color}">${fmtVal(cur)}</span>`;
+
+    const track = document.createElement('div');
+    track.className = 'bar-track';
+    const fill  = document.createElement('div');
+    fill.className = 'bar-fill';
+    fill.style.width  = `${pct}%`;
+    fill.style.background = color;
+    fill.style.boxShadow   = `0 0 4px ${color}`;
+    track.appendChild(fill);
+
+    div.appendChild(labelRow);
+    div.appendChild(track);
+    list.appendChild(div);
+  });
+}
+
+// ── Text box ──────────────────────────────────────────────────────────────────
+function buildTextBody(body, w, state) {
+  const pre = document.createElement('div');
+  pre.className = 'textbox-content';
+  pre.id = `tx-${w.id}`;
+  const item = w.items[0];
+  if (item) pre.style.color = item.color || COL.text;
+  body.appendChild(pre);
+  state.el.style.minHeight = '200px';
+}
+
+function updateText(w, state) {
+  const el = $(`tx-${w.id}`);
+  if (!el) return;
+  const item = w.items[0];
+  if (!item) return;
+  el.textContent = item.current || '';
+  el.style.color = item.color || COL.text;
+}
+
+// ── ASCII box ─────────────────────────────────────────────────────────────────
+function buildAsciiBody(body, w, state) {
+  const el = document.createElement('div');
+  el.className = 'asciibox-content';
+  el.id = `ax-${w.id}`;
+  const item = w.items[0];
+  if (item) el.style.color = item.color || COL.green;
+  body.appendChild(el);
+  state.el.style.minHeight = '100px';
+}
+
+function updateAscii(w, state) {
+  const el = $(`ax-${w.id}`);
+  if (!el) return;
+  const item = w.items[0];
+  if (!item) return;
+  el.textContent = item.current || '';
+  el.style.color = item.color || COL.green;
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+function fmtVal(v) {
+  if (typeof v !== 'number') return String(v);
+  if (v >= 1e9)  return (v/1e9).toFixed(1)+'G';
+  if (v >= 1e6)  return (v/1e6).toFixed(1)+'M';
+  if (v >= 1000) return (v/1000).toFixed(1)+'K';
+  if (v < 10)    return v.toFixed(2);
+  return v.toFixed(1);
+}
+
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+connect();
+pollStatus();
+</script>
+<footer style="text-align:center;padding:16px 0;margin-top:32px;border-top:1px solid #1e2d1e;color:#2e4e2e;font-size:13px;font-family:var(--font);">
+  Developed by <a href="https://kccsonline.com" target="_blank" style="color:#5a8a5a;text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:#2e4e2e;text-decoration:none;">kccsonline.com</a>
+</footer>
+</body>
+</html>

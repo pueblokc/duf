@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fail2ban Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --bg3: #232733;
+    --border: #2e3341;
+    --text: #e4e7ec;
+    --text2: #9ca3b4;
+    --text3: #6b7280;
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --orange: #f97316;
+    --purple: #8b5cf6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 1440px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--red-dim); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .logo h1 { font-size: 20px; font-weight: 700; }
+  .logo h1 span { color: var(--red); }
+  .mode-badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .mode-badge.demo { background: var(--yellow-dim); color: var(--yellow); }
+  .mode-badge.live { background: var(--green-dim); color: var(--green); }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .refresh-btn {
+    padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg3);
+    color: var(--text); font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .refresh-btn:hover { border-color: var(--blue); }
+  .auto-refresh { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); }
+  .auto-refresh input { accent-color: var(--blue); }
+
+  /* Stats row */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 0; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .stat-icon {
+    width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .stat-icon.red { background: var(--red-dim); }
+  .stat-icon.blue { background: var(--blue-dim); }
+  .stat-icon.green { background: var(--green-dim); }
+  .stat-icon.yellow { background: var(--yellow-dim); }
+  .stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  /* Main grid */
+  .main-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; padding-bottom: 40px; }
+
+  /* Jails panel */
+  .panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .panel-body { padding: 0; }
+
+  /* Jail cards */
+  .jail-card {
+    padding: 16px 20px; border-bottom: 1px solid var(--border); display: grid;
+    grid-template-columns: 1fr auto auto auto; align-items: center; gap: 16px; transition: background 0.15s;
+  }
+  .jail-card:hover { background: var(--bg3); }
+  .jail-card:last-child { border-bottom: none; }
+  .jail-name { font-weight: 600; font-size: 14px; }
+  .jail-name .sub { font-weight: 400; color: var(--text3); font-size: 12px; margin-top: 2px; }
+  .jail-stat { text-align: center; min-width: 70px; }
+  .jail-stat .num { font-size: 18px; font-weight: 700; }
+  .jail-stat .num.red { color: var(--red); }
+  .jail-stat .num.yellow { color: var(--yellow); }
+  .jail-stat .num.green { color: var(--green); }
+  .jail-stat .lbl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+  .jail-actions { display: flex; gap: 6px; }
+  .jail-expand {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
+    color: var(--text2); font-size: 12px; cursor: pointer;
+  }
+  .jail-expand:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* Banned IPs expansion */
+  .jail-detail {
+    display: none; padding: 12px 20px 16px; background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .jail-detail.open { display: block; }
+  .ip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ip-tag {
+    padding: 4px 10px; background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px;
+    font-size: 12px; font-family: 'Consolas', monospace; color: var(--red); display: flex; align-items: center; gap: 6px;
+  }
+  .ip-tag .unban {
+    cursor: pointer; opacity: 0.5; font-size: 14px; line-height: 1;
+  }
+  .ip-tag .unban:hover { opacity: 1; }
+  .no-bans { color: var(--text3); font-size: 13px; padding: 8px 0; }
+
+  /* Right sidebar */
+  .sidebar { display: grid; gap: 16px; align-content: start; }
+
+  /* Top IPs */
+  .top-ip-item {
+    display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+  }
+  .top-ip-item:last-child { border-bottom: none; }
+  .top-ip-rank {
+    width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; background: var(--bg); color: var(--text3);
+  }
+  .top-ip-rank.hot { background: var(--red-dim); color: var(--red); }
+  .top-ip-info .ip { font-family: 'Consolas', monospace; font-size: 13px; font-weight: 600; }
+  .top-ip-info .meta { font-size: 11px; color: var(--text3); }
+  .top-ip-count { font-size: 18px; font-weight: 700; color: var(--red); }
+
+  /* Manual ban form */
+  .ban-form { padding: 16px 20px; }
+  .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .form-input {
+    flex: 1; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 13px; font-family: 'Consolas', monospace;
+  }
+  .form-input:focus { outline: none; border-color: var(--blue); }
+  .form-select {
+    padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 13px;
+  }
+  .form-btn {
+    padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .form-btn.ban { background: var(--red); color: white; }
+  .form-btn.ban:hover { background: #dc2626; }
+
+  /* Timeline */
+  .timeline-bar { display: flex; align-items: flex-end; gap: 2px; height: 80px; padding: 16px 20px; }
+  .timeline-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .timeline-bar-fill {
+    width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.3s;
+  }
+  .timeline-label { font-size: 9px; color: var(--text3); margin-top: 4px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; z-index: 1000; transform: translateY(100px); opacity: 0; transition: all 0.3s;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  @media (max-width: 1000px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .jail-card { grid-template-columns: 1fr auto; }
+    .jail-stat:nth-child(3) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container header-inner">
+    <div class="logo">
+      <div class="logo-icon">&#128274;</div>
+      <div>
+        <h1>fail2ban <span>Dashboard</span></h1>
+      </div>
+      <div class="mode-badge demo" id="modeBadge">DEMO</div>
+    </div>
+    <div class="header-actions">
+      <div class="auto-refresh">
+        <input type="checkbox" id="autoRefresh" checked>
+        <label for="autoRefresh">Auto-refresh 30s</label>
+      </div>
+      <button class="refresh-btn" onclick="loadData()">&#8635; Refresh</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon red">&#128683;</div>
+      <div>
+        <div class="stat-value" id="statBanned">0</div>
+        <div class="stat-label">Currently Banned</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon blue">&#128737;</div>
+      <div>
+        <div class="stat-value" id="statJails">0</div>
+        <div class="stat-label">Active Jails</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon yellow">&#9888;</div>
+      <div>
+        <div class="stat-value" id="statFailed">0</div>
+        <div class="stat-label">Total Failed</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green">&#10003;</div>
+      <div>
+        <div class="stat-value" id="statTotalBanned">0</div>
+        <div class="stat-label">Total Banned (all time)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left: Jails -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">&#128737; Active Jails</div>
+        </div>
+        <div class="panel-body" id="jailsList">
+          <div style="padding: 40px; text-align: center; color: var(--text3);">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div class="sidebar">
+      <!-- Manual Ban -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">&#128295; Manual Actions</div>
+        </div>
+        <div class="ban-form">
+          <div class="form-row">
+            <input type="text" class="form-input" id="banIpInput" placeholder="IP address (e.g. 192.168.1.100)">
+          </div>
+          <div class="form-row">
+            <select class="form-select" id="banJailSelect" style="flex:1"></select>
+            <button class="form-btn ban" onclick="manualBan()">Ban IP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Offenders -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">&#128293; Top Offenders</div>
+        </div>
+        <div class="panel-body" id="topIpsList">
+          <div style="padding: 20px; text-align: center; color: var(--text3);">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Ban Timeline -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">&#128200; 24h Ban Timeline</div>
+        </div>
+        <div class="timeline-bar" id="timeline"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let refreshInterval = null;
+let currentData = null;
+
+async function loadData() {
+  try {
+    const [statusRes, modeRes] = await Promise.all([
+      fetch('/api/status'),
+      fetch('/api/mode'),
+    ]);
+    const data = await statusRes.json();
+    const mode = await modeRes.json();
+    currentData = data;
+
+    // Update mode badge
+    const badge = document.getElementById('modeBadge');
+    if (mode.demo) {
+      badge.textContent = 'DEMO';
+      badge.className = 'mode-badge demo';
+    } else {
+      badge.textContent = 'LIVE';
+      badge.className = 'mode-badge live';
+    }
+
+    // Update stats
+    document.getElementById('statBanned').textContent = data.total_banned_now || 0;
+    document.getElementById('statJails').textContent = data.total_jails || 0;
+
+    let totalFailed = 0, totalBanned = 0;
+    const jails = data.jails || {};
+    Object.values(jails).forEach(j => {
+      totalFailed += (j.filter?.total_failed || j.total_failed || 0);
+      totalBanned += (j.total_banned || 0);
+    });
+    document.getElementById('statFailed').textContent = formatNum(totalFailed);
+    document.getElementById('statTotalBanned').textContent = formatNum(totalBanned);
+
+    // Render jails
+    renderJails(jails);
+
+    // Render top IPs
+    if (data.top_ips) renderTopIPs(data.top_ips);
+
+    // Render timeline
+    if (data.timeline) renderTimeline(data.timeline);
+
+    // Update jail select
+    const select = document.getElementById('banJailSelect');
+    select.innerHTML = Object.keys(jails).map(j => `<option value="${j}">${j}</option>`).join('');
+
+  } catch (e) {
+    console.error('Load error:', e);
+    showToast('Failed to load data: ' + e.message, 'error');
+  }
+}
+
+function renderJails(jails) {
+  const container = document.getElementById('jailsList');
+  if (!Object.keys(jails).length) {
+    container.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text3);">No jails found</div>';
+    return;
+  }
+
+  let html = '';
+  for (const [name, jail] of Object.entries(jails)) {
+    const bannedCount = jail.currently_banned || 0;
+    const failedCount = jail.filter?.total_failed || jail.total_failed || 0;
+    const totalBanned = jail.total_banned || 0;
+    const ips = jail.banned_ips || [];
+
+    html += `
+      <div class="jail-card" onclick="toggleJail('${name}')">
+        <div class="jail-name">
+          ${escapeHtml(name)}
+          <div class="sub">${ips.length} IPs currently banned</div>
+        </div>
+        <div class="jail-stat">
+          <div class="num ${bannedCount > 0 ? 'red' : 'green'}">${bannedCount}</div>
+          <div class="lbl">Banned</div>
+        </div>
+        <div class="jail-stat">
+          <div class="num yellow">${formatNum(failedCount)}</div>
+          <div class="lbl">Failed</div>
+        </div>
+        <div class="jail-stat">
+          <div class="num">${formatNum(totalBanned)}</div>
+          <div class="lbl">Total</div>
+        </div>
+      </div>
+      <div class="jail-detail" id="jail-${name}">
+        ${ips.length > 0
+          ? `<div class="ip-list">${ips.map(ip => `
+              <div class="ip-tag">
+                ${escapeHtml(ip)}
+                <span class="unban" onclick="event.stopPropagation(); unbanIP('${name}', '${ip}')" title="Unban">&times;</span>
+              </div>
+            `).join('')}</div>`
+          : '<div class="no-bans">No IPs currently banned in this jail</div>'
+        }
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+function renderTopIPs(topIps) {
+  const container = document.getElementById('topIpsList');
+  if (!topIps.length) {
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text3);">No data</div>';
+    return;
+  }
+
+  container.innerHTML = topIps.slice(0, 10).map((ip, i) => `
+    <div class="top-ip-item">
+      <div class="top-ip-rank ${i < 3 ? 'hot' : ''}">${i + 1}</div>
+      <div class="top-ip-info">
+        <div class="ip">${escapeHtml(ip.ip)}</div>
+        <div class="meta">${ip.country || '??'} &bull; ${(ip.jails || []).join(', ')}</div>
+      </div>
+      <div class="top-ip-count">${ip.ban_count}</div>
+    </div>
+  `).join('');
+}
+
+function renderTimeline(timeline) {
+  const container = document.getElementById('timeline');
+  // Group by hour
+  const hours = {};
+  for (let h = 0; h < 24; h++) {
+    const label = String(h).padStart(2, '0') + ':00';
+    hours[label] = 0;
+  }
+  timeline.forEach(t => { hours[t.hour] = (hours[t.hour] || 0) + t.count; });
+
+  const maxVal = Math.max(1, ...Object.values(hours));
+  const colors = [
+    'var(--green)', 'var(--green)', 'var(--yellow)', 'var(--yellow)',
+    'var(--orange)', 'var(--orange)', 'var(--red)', 'var(--red)',
+  ];
+
+  container.innerHTML = Object.entries(hours).map(([hour, count]) => {
+    const height = Math.max(2, (count / maxVal) * 60);
+    const intensity = Math.min(7, Math.floor((count / maxVal) * 7));
+    const color = colors[intensity] || 'var(--green)';
+    return `
+      <div class="timeline-col">
+        <div class="timeline-bar-fill" style="height: ${height}px; background: ${color};"></div>
+        <div class="timeline-label">${hour.split(':')[0]}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleJail(name) {
+  const el = document.getElementById('jail-' + name);
+  if (el) el.classList.toggle('open');
+}
+
+async function unbanIP(jail, ip) {
+  if (!confirm(`Unban ${ip} from ${jail}?`)) return;
+  try {
+    const res = await fetch(`/api/jail/${jail}/unban/${ip}`, { method: 'POST' });
+    const data = await res.json();
+    showToast(data.message, 'success');
+    loadData();
+  } catch (e) {
+    showToast('Unban failed: ' + e.message, 'error');
+  }
+}
+
+async function manualBan() {
+  const ip = document.getElementById('banIpInput').value.trim();
+  const jail = document.getElementById('banJailSelect').value;
+  if (!ip) return;
+  if (!confirm(`Ban ${ip} in ${jail}?`)) return;
+
+  try {
+    const res = await fetch(`/api/jail/${jail}/ban/${ip}`, { method: 'POST' });
+    const data = await res.json();
+    showToast(data.message, 'success');
+    document.getElementById('banIpInput').value = '';
+    loadData();
+  } catch (e) {
+    showToast('Ban failed: ' + e.message, 'error');
+  }
+}
+
+function formatNum(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(n);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// Auto-refresh
+document.getElementById('autoRefresh').addEventListener('change', (e) => {
+  if (e.target.checked) {
+    refreshInterval = setInterval(loadData, 30000);
+  } else {
+    clearInterval(refreshInterval);
+  }
+});
+
+refreshInterval = setInterval(loadData, 30000);
+loadData();
+</script>
+<footer style="text-align:center;padding:16px 0;margin-top:32px;border-top:1px solid var(--border);color:var(--text3);font-size:13px;">
+  Developed by <a href="https://kccsonline.com" target="_blank" style="color:var(--text2);text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:var(--text3);text-decoration:none;">kccsonline.com</a>
+</footer>
+</body>
+</html>

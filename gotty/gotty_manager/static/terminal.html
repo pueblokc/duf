@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoTTY Terminal</title>
+
+  <!-- xterm.js 5.3.0 from CDN -->
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --border:  #30363d;
+      --accent:  #58a6ff;
+      --text:    #c9d1d9;
+      --muted:   #8b949e;
+      --danger:  #f85149;
+      --accent2: #3fb950;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      height: 44px;
+      flex-shrink: 0;
+    }
+    #topbar .logo { font-weight: 700; color: var(--accent); font-size: 14px; }
+    #topbar .session-id {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(0,0,0,0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    #topbar .spacer { flex: 1; }
+
+    .conn-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .conn-indicator .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      transition: background 0.3s;
+    }
+    .conn-indicator.connected { color: var(--accent2); background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); }
+    .conn-indicator.connected .dot { background: var(--accent2); animation: pulse 2s infinite; }
+    .conn-indicator.disconnected { color: var(--danger); background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); }
+    .conn-indicator.disconnected .dot { background: var(--danger); }
+    .conn-indicator.connecting { color: #e3b341; background: rgba(227,179,65,0.1); border: 1px solid rgba(227,179,65,0.3); }
+    .conn-indicator.connecting .dot { background: #e3b341; }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+
+    .btn-top {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-top:hover { background: var(--border); }
+
+    /* ── Terminal wrapper ── */
+    #layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #terminal-wrapper {
+      flex: 1;
+      padding: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    #terminal {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Overlay states ── */
+    #overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(13,17,23,0.9);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      color: var(--text);
+      font-size: 15px;
+      z-index: 10;
+    }
+    #overlay.show { display: flex; }
+    #overlay .icon { font-size: 48px; }
+    #overlay .msg { color: var(--muted); font-size: 13px; }
+    #overlay button {
+      padding: 8px 20px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #0d1117;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+<div id="layout">
+  <div id="topbar">
+    <div class="logo">GoTTY</div>
+    <div class="session-id" id="session-label">Loading…</div>
+    <div class="spacer"></div>
+    <div class="conn-indicator connecting" id="conn-indicator">
+      <div class="dot"></div>
+      <span id="conn-text">Connecting</span>
+    </div>
+    <a class="btn-top" href="/" title="Back to dashboard">← Dashboard</a>
+  </div>
+
+  <div id="terminal-wrapper">
+    <div id="terminal"></div>
+    <div id="overlay">
+      <div class="icon" id="overlay-icon">🔌</div>
+      <div id="overlay-title">Disconnected</div>
+      <div class="msg" id="overlay-msg">The terminal session has ended.</div>
+      <button onclick="reconnect()">Reconnect</button>
+    </div>
+  </div>
+  <footer style="text-align:center;padding:4px 0;border-top:1px solid #30363d;color:#484f58;font-size:11px;flex-shrink:0;">
+    Developed by <a href="https://kccsonline.com" target="_blank" style="color:#8b949e;text-decoration:none;">KCCS</a> &bull; <a href="https://kccsonline.com" target="_blank" style="color:#484f58;text-decoration:none;">kccsonline.com</a>
+  </footer>
+</div>
+
+<script>
+  // ── Parse URL params ──────────────────────────────────────────────────────
+  const pathParts   = window.location.pathname.split('/');
+  const SESSION_ID  = pathParts[pathParts.length - 1];
+  const params      = new URLSearchParams(window.location.search);
+  const TOKEN       = params.get('token') || '';
+
+  document.getElementById('session-label').textContent = SESSION_ID
+    ? `Session: ${SESSION_ID.slice(0, 8)}…`
+    : 'No session';
+
+  // ── xterm setup ──────────────────────────────────────────────────────────
+  const term = new Terminal({
+    cursorBlink:    true,
+    cursorStyle:    'block',
+    fontFamily:     "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
+    fontSize:       14,
+    lineHeight:     1.2,
+    letterSpacing:  0,
+    theme: {
+      background:    '#0d1117',
+      foreground:    '#c9d1d9',
+      cursor:        '#58a6ff',
+      cursorAccent:  '#0d1117',
+      black:         '#484f58',
+      red:           '#ff7b72',
+      green:         '#3fb950',
+      yellow:        '#d29922',
+      blue:          '#58a6ff',
+      magenta:       '#bc8cff',
+      cyan:          '#39c5cf',
+      white:         '#b1bac4',
+      brightBlack:   '#6e7681',
+      brightRed:     '#ffa198',
+      brightGreen:   '#56d364',
+      brightYellow:  '#e3b341',
+      brightBlue:    '#79c0ff',
+      brightMagenta: '#d2a8ff',
+      brightCyan:    '#56d4dd',
+      brightWhite:   '#f0f6fc',
+    },
+    allowTransparency: false,
+    scrollback: 5000,
+  });
+
+  const fitAddon       = new FitAddon.FitAddon();
+  const webLinksAddon  = new WebLinksAddon.WebLinksAddon();
+  term.loadAddon(fitAddon);
+  term.loadAddon(webLinksAddon);
+  term.open(document.getElementById('terminal'));
+  fitAddon.fit();
+
+  window.addEventListener('resize', () => fitAddon.fit());
+
+  // ── Connection state ──────────────────────────────────────────────────────
+  let ws = null;
+  let reconnectTimer = null;
+
+  function setConnState(state) {
+    const el   = document.getElementById('conn-indicator');
+    const txt  = document.getElementById('conn-text');
+    el.className = `conn-indicator ${state}`;
+    const labels = { connecting: 'Connecting', connected: 'Connected', disconnected: 'Disconnected' };
+    txt.textContent = labels[state] || state;
+  }
+
+  // ── WebSocket ─────────────────────────────────────────────────────────────
+  function connect() {
+    if (!SESSION_ID) {
+      showOverlay('⚠️', 'No Session', 'No session ID in URL. Go back to the dashboard.');
+      return;
+    }
+
+    setConnState('connecting');
+
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl    = `${protocol}://${location.host}/ws/${SESSION_ID}?token=${TOKEN}`;
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      setConnState('connected');
+      hideOverlay();
+      term.focus();
+      term.writeln('\x1b[32m[GoTTY Manager] Connected to session ' + SESSION_ID.slice(0,8) + '…\x1b[0m');
+      fitAddon.fit();
+    };
+
+    ws.onmessage = (e) => {
+      if (e.data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(e.data));
+      } else if (typeof e.data === 'string') {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'exit') {
+            term.writeln(`\r\n\x1b[33m[GoTTY Manager] Session ended (exit ${msg.code ?? '?'})\x1b[0m`);
+            showOverlay('🔌', 'Session Ended', `Process exited with code ${msg.code ?? 'unknown'}`);
+            setConnState('disconnected');
+          }
+        } catch {
+          term.write(e.data);
+        }
+      }
+    };
+
+    ws.onclose = (e) => {
+      setConnState('disconnected');
+      if (e.code !== 1000) {
+        term.writeln(`\r\n\x1b[31m[GoTTY Manager] Connection closed (${e.code}: ${e.reason || 'unknown'})\x1b[0m`);
+        showOverlay('🔌', 'Disconnected', `Code: ${e.code} — ${e.reason || 'Connection lost'}`);
+      }
+    };
+
+    ws.onerror = () => {
+      setConnState('disconnected');
+      term.writeln('\r\n\x1b[31m[GoTTY Manager] WebSocket error\x1b[0m');
+    };
+  }
+
+  // Forward terminal input to WebSocket
+  term.onData((data) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
+  });
+
+  // ── Overlay helpers ───────────────────────────────────────────────────────
+  function showOverlay(icon, title, msg) {
+    document.getElementById('overlay-icon').textContent  = icon;
+    document.getElementById('overlay-title').textContent = title;
+    document.getElementById('overlay-msg').textContent   = msg;
+    document.getElementById('overlay').classList.add('show');
+  }
+
+  function hideOverlay() {
+    document.getElementById('overlay').classList.remove('show');
+  }
+
+  function reconnect() {
+    hideOverlay();
+    term.clear();
+    if (ws) { try { ws.close(); } catch {} ws = null; }
+    connect();
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  connect();
+</script>
+</body>
+</html>

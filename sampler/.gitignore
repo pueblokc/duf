@@ -1,0 +1,15 @@
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.db
+.idea/
+*.iml
+*.iws
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+take_screenshot.py
